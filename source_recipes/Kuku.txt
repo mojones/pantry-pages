@@ -1,0 +1,18 @@
+Title: Kuku
+Description: 
+Source: 
+Original URL: 
+Yield: 
+Cookbook: First Cookbook
+Section: First Section
+Image: 
+Ingredients: 
+	500g potatoes
+	2 onions
+	2 peppers
+	1 courgette
+	150g chickpea flower 3
+	50g rice flour
+	2 tablespoons oil
+Instructions: 
+	Cook 

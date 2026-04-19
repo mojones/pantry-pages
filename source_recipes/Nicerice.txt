@@ -1,0 +1,15 @@
+Title: Nice rice
+Description: 
+Source: 
+Original URL: 
+Yield: 
+Cookbook: First Cookbook
+Section: First Section
+Image: 
+Ingredients: 
+	200g rice
+	1 tbsp sesame oil
+	half teaspoon salt
+	350 ml water
+Instructions: 
+	14 minutes

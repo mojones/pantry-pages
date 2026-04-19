@@ -1,0 +1,13 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="800" rx="48" fill="#F5EADB"/>
+  <rect x="72" y="72" width="1056" height="656" rx="36" fill="#FFF9F1"/>
+  <circle cx="600" cy="360" r="168" fill="#D96F3D"/>
+  <circle cx="600" cy="360" r="124" fill="#F7C873"/>
+  <path d="M538 334C564 298 611 285 652 299C689 312 718 342 726 381" stroke="#8D4A2F" stroke-width="20" stroke-linecap="round"/>
+  <path d="M493 404C515 450 563 482 615 485C671 489 724 459 752 411" stroke="#8D4A2F" stroke-width="20" stroke-linecap="round"/>
+  <path d="M479 287L455 258" stroke="#6B9E59" stroke-width="18" stroke-linecap="round"/>
+  <path d="M705 255L730 225" stroke="#6B9E59" stroke-width="18" stroke-linecap="round"/>
+  <path d="M759 353L798 347" stroke="#6B9E59" stroke-width="18" stroke-linecap="round"/>
+  <path d="M423 372L384 363" stroke="#6B9E59" stroke-width="18" stroke-linecap="round"/>
+  <text x="600" y="635" text-anchor="middle" fill="#8D4A2F" font-family="Georgia, serif" font-size="56" font-weight="700">Recipe Image Coming Soon</text>
+</svg>

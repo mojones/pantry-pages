@@ -1,0 +1,15 @@
+Title: Fritata
+Description: 
+Source: 
+Original URL: 
+Yield: 
+Cookbook: First Cookbook
+Section: First Section
+Image: 
+Ingredients: 
+	200g chickpea flour
+	2 onions
+	500 cooked potato
+	2 peppers
+Instructions: 
+	You know what to do

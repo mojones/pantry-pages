@@ -1,0 +1,17 @@
+Title: Nikki's tiffin
+Description: 
+Source: 
+Original URL: 
+Yield: 
+Cookbook: First Cookbook
+Section: bars
+Image: 
+Ingredients: 
+	150g vitalite
+	6 tablespoons golden syrup
+	3 tablespoons cocoa powder
+	1 tablespoon brown sugar
+	1 packet crushed digestive biscuits
+	raisins
+Instructions: 
+	melt and mix everything except the chocolate, then press into a tray and top with melted chocolate then fridge.

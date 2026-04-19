@@ -1,0 +1,14 @@
+Title: Haggis bake
+Description: 
+Source: 
+Original URL: 
+Yield: 
+Cookbook: First Cookbook
+Section: First Section
+Image: 
+Ingredients: 
+	veggie haggis
+	potatoes
+	swede
+Instructions: 
+	Layer and bake

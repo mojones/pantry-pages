@@ -1,0 +1,15 @@
+Title: Sausage potato apple bake
+Description: 
+Source: 
+Original URL: 
+Yield: 
+Cookbook: First Cookbook
+Section: First Section
+Image: 
+Ingredients: 
+	2 packs vegan sausages
+	3 red onions
+	3 apples
+	6 large potatoes
+Instructions: 
+	You know what to do
