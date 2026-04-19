@@ -6,6 +6,11 @@ Recipe planner and cookbook app built with React, TypeScript, and Vite.
 
 This project currently uses Vite for the frontend and a Vite-mounted import API during local development.
 
+## Production Auth
+
+Set `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD` in Railway before exposing the service publicly.
+The server leaves `/healthz` open for platform health checks and protects the app, assets, and API with HTTP Basic Auth.
+
 ## Vite Template Notes
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
