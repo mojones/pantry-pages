@@ -1,4 +1,12 @@
-# React + TypeScript + Vite
+# Pantry Pages
+
+Recipe planner and cookbook app built with React, TypeScript, and Vite.
+
+## Development
+
+This project currently uses Vite for the frontend and a Vite-mounted import API during local development.
+
+## Vite Template Notes
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
