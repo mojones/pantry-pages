@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { registerRecipeImportRoute } from './src/recipeApi'
+import { registerAppApiRoutes } from './src/recipeApi'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -9,10 +9,10 @@ export default defineConfig({
     {
       name: 'recipe-import-api',
       configureServer(server) {
-        registerRecipeImportRoute(server.middlewares)
+        registerAppApiRoutes(server.middlewares)
       },
       configurePreviewServer(server) {
-        registerRecipeImportRoute(server.middlewares)
+        registerAppApiRoutes(server.middlewares)
       },
     },
   ],

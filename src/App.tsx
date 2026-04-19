@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import { buildImportedRecipe, recipes, type Ingredient, type Recipe } from './recipes'
 import type { ImportedRecipePayload } from './recipeImport'
@@ -10,6 +10,12 @@ type PlannedRecipe = {
 
 type View = 'cookbook' | 'recipe' | 'planner' | 'shopping' | 'import'
 
+type PersistedAppState = {
+  importedRecipes: Recipe[]
+  plannedRecipes: PlannedRecipe[]
+  recipeNotes: Record<string, string>
+}
+
 const featureIdeas = [
   'Cookbook sections and tags for organizing the library.',
   'Search across titles, ingredients, authors, and source types.',
@@ -19,6 +25,10 @@ const featureIdeas = [
 ]
 
 const initialPlannedRecipes: PlannedRecipe[] = []
+const baseRecipeIds = new Set(recipes.map((recipe) => recipe.id))
+const baseRecipeNotes = Object.fromEntries(
+  recipes.map((recipe) => [recipe.id, recipe.notes]),
+) as Record<string, string>
 
 const views: { id: View; label: string; caption: string }[] = [
   { id: 'cookbook', label: 'Cookbook', caption: 'Browse and filter the library' },
@@ -171,6 +181,22 @@ function handleRecipeImageError(event: React.SyntheticEvent<HTMLImageElement>) {
   event.currentTarget.src = recipePlaceholderImage
 }
 
+function mergeRecipeLibrary(importedRecipes: Recipe[]) {
+  const seenRecipeIds = new Set(baseRecipeIds)
+
+  return [
+    ...recipes,
+    ...importedRecipes.filter((recipe) => {
+      if (seenRecipeIds.has(recipe.id)) {
+        return false
+      }
+
+      seenRecipeIds.add(recipe.id)
+      return true
+    }),
+  ]
+}
+
 function App() {
   const [recipeLibrary, setRecipeLibrary] = useState(recipes)
   const [activeView, setActiveView] = useState<View>('cookbook')
@@ -178,9 +204,7 @@ function App() {
   const [selectedRecipeId, setSelectedRecipeId] = useState(recipes[0].id)
   const [search, setSearch] = useState('')
   const [plannedRecipesState, setPlannedRecipesState] = useState(initialPlannedRecipes)
-  const [recipeNotes, setRecipeNotes] = useState(
-    Object.fromEntries(recipes.map((recipe) => [recipe.id, recipe.notes])),
-  )
+  const [recipeNotes, setRecipeNotes] = useState(baseRecipeNotes)
   const [ingredientPickerOpen, setIngredientPickerOpen] = useState(false)
   const [ingredientSelection, setIngredientSelection] = useState<string[]>([])
   const [pickerRecipeId, setPickerRecipeId] = useState(recipes[0].id)
@@ -191,6 +215,113 @@ function App() {
   const [importError, setImportError] = useState('')
   const [importStatus, setImportStatus] = useState<'idle' | 'loading'>('idle')
   const [lastImportedRecipeTitle, setLastImportedRecipeTitle] = useState('')
+  const [stateReady, setStateReady] = useState(false)
+  const [stateError, setStateError] = useState('')
+
+  useEffect(() => {
+    let ignore = false
+
+    async function loadPersistedState() {
+      try {
+        const response = await fetch('/api/state')
+        const payload = (await response.json()) as PersistedAppState | { error: string }
+
+        if (!response.ok || !('importedRecipes' in payload)) {
+          throw new Error('error' in payload ? payload.error : 'Unable to load saved app state.')
+        }
+
+        if (ignore) {
+          return
+        }
+
+        const mergedRecipes = mergeRecipeLibrary(payload.importedRecipes)
+        const availableRecipeIds = new Set(mergedRecipes.map((recipe) => recipe.id))
+
+        setRecipeLibrary(mergedRecipes)
+        setRecipeNotes({
+          ...Object.fromEntries(mergedRecipes.map((recipe) => [recipe.id, recipe.notes])),
+          ...payload.recipeNotes,
+        })
+        setPlannedRecipesState(
+          payload.plannedRecipes.filter((plannedRecipe) =>
+            availableRecipeIds.has(plannedRecipe.recipeId),
+          ),
+        )
+        setSelectedRecipeId((currentRecipeId) =>
+          availableRecipeIds.has(currentRecipeId) ? currentRecipeId : mergedRecipes[0].id,
+        )
+        setStateError('')
+      } catch (error) {
+        if (!ignore) {
+          setStateError(
+            error instanceof Error ? error.message : 'Unable to load saved app state.',
+          )
+        }
+      } finally {
+        if (!ignore) {
+          setStateReady(true)
+        }
+      }
+    }
+
+    void loadPersistedState()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!stateReady) {
+      return
+    }
+
+    let ignore = false
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const importedRecipes = recipeLibrary.filter((recipe) => !baseRecipeIds.has(recipe.id))
+          const persistedNotes = Object.fromEntries(
+            Object.entries(recipeNotes).filter(
+              ([recipeId, note]) => !baseRecipeIds.has(recipeId) || note.trim(),
+            ),
+          )
+
+          const response = await fetch('/api/state', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              importedRecipes,
+              plannedRecipes: plannedRecipesState,
+              recipeNotes: persistedNotes,
+            } satisfies PersistedAppState),
+          })
+
+          if (!response.ok) {
+            const payload = (await response.json()) as { error?: string }
+            throw new Error(payload.error || 'Unable to save app state.')
+          }
+
+          if (!ignore) {
+            setStateError('')
+          }
+        } catch (error) {
+          if (!ignore) {
+            setStateError(
+              error instanceof Error ? error.message : 'Unable to save app state.',
+            )
+          }
+        }
+      })()
+    }, 300)
+
+    return () => {
+      ignore = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [plannedRecipesState, recipeLibrary, recipeNotes, stateReady])
 
   const allSections = ['All', ...new Set(recipeLibrary.map((recipe) => recipe.section))]
 
@@ -369,6 +500,7 @@ function App() {
         <div className="topbar__meta">
           <span>React + TypeScript + Vite</span>
           <span>Tabbed single-page prototype</span>
+          {stateError ? <span>{stateError}</span> : null}
         </div>
       </header>
 
