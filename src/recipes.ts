@@ -350,4 +350,4 @@ function buildImportedRecipe(draft: ImportedRecipeDraft, existingIds: Set<string
 }
 
 export type { ImportedRecipeDraft, Ingredient, Recipe }
-export { buildImportedRecipe, recipes }
+export { buildImportedRecipe, recipes, splitIngredient }

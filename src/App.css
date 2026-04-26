@@ -318,6 +318,10 @@ textarea {
   align-items: start;
 }
 
+.shopping-tools {
+  margin-bottom: 22px;
+}
+
 .import-card--note {
   background:
     linear-gradient(135deg, rgba(242, 98, 70, 0.08), rgba(242, 175, 70, 0.14)),
@@ -426,18 +430,21 @@ textarea {
 
 .plain-list,
 .step-list,
-.check-list {
+.check-list,
+.manual-shopping-list {
   margin: 0;
   padding: 0;
 }
 
 .plain-list,
-.check-list {
+.check-list,
+.manual-shopping-list {
   list-style: none;
 }
 
 .plain-list li,
-.check-list li {
+.check-list li,
+.manual-shopping-list li {
   display: flex;
   justify-content: space-between;
   gap: 12px;

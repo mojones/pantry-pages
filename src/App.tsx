@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import { buildImportedRecipe, recipes, type Ingredient, type Recipe } from './recipes'
+import {
+  buildImportedRecipe,
+  recipes,
+  splitIngredient,
+  type Ingredient,
+  type Recipe,
+} from './recipes'
 import type { ImportedRecipePayload } from './recipeImport'
 
 type PlannedRecipe = {
@@ -14,6 +20,7 @@ type PersistedAppState = {
   importedRecipes: Recipe[]
   plannedRecipes: PlannedRecipe[]
   recipeNotes: Record<string, string>
+  manualShoppingItems: string[]
 }
 
 const featureIdeas = [
@@ -215,6 +222,8 @@ function App() {
   const [importError, setImportError] = useState('')
   const [importStatus, setImportStatus] = useState<'idle' | 'loading'>('idle')
   const [lastImportedRecipeTitle, setLastImportedRecipeTitle] = useState('')
+  const [manualShoppingItems, setManualShoppingItems] = useState<string[]>([])
+  const [manualShoppingInput, setManualShoppingInput] = useState('')
   const [stateReady, setStateReady] = useState(false)
   const [stateError, setStateError] = useState('')
 
@@ -247,6 +256,7 @@ function App() {
             availableRecipeIds.has(plannedRecipe.recipeId),
           ),
         )
+        setManualShoppingItems(payload.manualShoppingItems)
         setSelectedRecipeId((currentRecipeId) =>
           availableRecipeIds.has(currentRecipeId) ? currentRecipeId : mergedRecipes[0].id,
         )
@@ -296,6 +306,7 @@ function App() {
               importedRecipes,
               plannedRecipes: plannedRecipesState,
               recipeNotes: persistedNotes,
+              manualShoppingItems,
             } satisfies PersistedAppState),
           })
 
@@ -321,7 +332,7 @@ function App() {
       ignore = true
       window.clearTimeout(timeoutId)
     }
-  }, [plannedRecipesState, recipeLibrary, recipeNotes, stateReady])
+  }, [manualShoppingItems, plannedRecipesState, recipeLibrary, recipeNotes, stateReady])
 
   const allSections = ['All', ...new Set(recipeLibrary.map((recipe) => recipe.section))]
 
@@ -379,6 +390,16 @@ function App() {
 
     return groups
   }, {})
+
+  manualShoppingItems
+    .map((item) => splitIngredient(item))
+    .forEach((ingredient) => {
+      if (!groceryByAisle[ingredient.aisle]) {
+        groceryByAisle[ingredient.aisle] = []
+      }
+
+      groceryByAisle[ingredient.aisle].push(formatIngredient(ingredient))
+    })
 
   function selectRecipe(recipeId: string) {
     setSelectedRecipeId(recipeId)
@@ -488,6 +509,30 @@ function App() {
       ...currentNotes,
       [selectedRecipe.id]: note,
     }))
+  }
+
+  function addManualShoppingItems() {
+    const newItems = manualShoppingInput
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    if (newItems.length === 0) {
+      return
+    }
+
+    setManualShoppingItems((currentItems) => [...currentItems, ...newItems])
+    setManualShoppingInput('')
+  }
+
+  function removeManualShoppingItem(index: number) {
+    setManualShoppingItems((currentItems) =>
+      currentItems.filter((_, itemIndex) => itemIndex !== index),
+    )
+  }
+
+  function clearManualShoppingItems() {
+    setManualShoppingItems([])
   }
 
   return (
@@ -823,6 +868,66 @@ function App() {
                 <h3>Generated From Planned Recipes</h3>
               </div>
               <span className="badge">{Object.keys(groceryByAisle).length} aisles</span>
+            </div>
+
+            <div className="import-layout shopping-tools">
+              <div className="import-card">
+                <label className="searchbox">
+                  <span>Add extra items, one per line</span>
+                  <textarea
+                    value={manualShoppingInput}
+                    onChange={(event) => setManualShoppingInput(event.target.value)}
+                    placeholder={'toilet roll\nolive oil\n2 l oat milk'}
+                  />
+                </label>
+
+                <div className="planner-actions">
+                  <div className="planner-hint">
+                    <span>Manual items</span>
+                    <p>
+                      These are parsed with the same ingredient logic as recipes, so they
+                      fall into the same aisle groups below.
+                    </p>
+                  </div>
+                  <button className="action-button" onClick={addManualShoppingItems}>
+                    Add Items
+                  </button>
+                </div>
+              </div>
+
+              <article className="import-card import-card--note">
+                <div className="panel__header">
+                  <div>
+                    <p className="eyebrow">Saved Extras</p>
+                    <h4>Manual Shopping Items</h4>
+                  </div>
+                  <button
+                    className="link-button"
+                    onClick={clearManualShoppingItems}
+                    disabled={manualShoppingItems.length === 0}
+                  >
+                    Clear Extras
+                  </button>
+                </div>
+
+                {manualShoppingItems.length > 0 ? (
+                  <ul className="manual-shopping-list">
+                    {manualShoppingItems.map((item, index) => (
+                      <li key={`${item}-${index}`}>
+                        <span>{item}</span>
+                        <button
+                          className="link-button"
+                          onClick={() => removeManualShoppingItem(index)}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="import-message">No extra shopping items yet.</p>
+                )}
+              </article>
             </div>
 
             <div className="grocery-grid">
