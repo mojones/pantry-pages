@@ -23,26 +23,18 @@ type PersistedAppState = {
   manualShoppingItems: string[]
 }
 
-const featureIdeas = [
-  'Cookbook sections and tags for organizing the library.',
-  'Search across titles, ingredients, authors, and source types.',
-  'A dedicated recipe screen with notes and structured ingredients.',
-  'A planner screen for collecting recipes to make next.',
-  'A shopping list screen generated directly from planned recipes.',
-]
-
 const initialPlannedRecipes: PlannedRecipe[] = []
 const baseRecipeIds = new Set(recipes.map((recipe) => recipe.id))
 const baseRecipeNotes = Object.fromEntries(
   recipes.map((recipe) => [recipe.id, recipe.notes]),
 ) as Record<string, string>
 
-const views: { id: View; label: string; caption: string }[] = [
-  { id: 'cookbook', label: 'Cookbook', caption: 'Browse and filter the library' },
-  { id: 'recipe', label: 'Recipe', caption: 'Read and edit the selected recipe' },
-  { id: 'planner', label: 'Planner', caption: 'Collect recipes you want to make' },
-  { id: 'shopping', label: 'Shopping List', caption: 'Generate groceries from the plan' },
-  { id: 'import', label: 'Import', caption: 'Create a recipe from a URL' },
+const views: { id: View; label: string; caption: string; icon: string }[] = [
+  { id: 'cookbook', label: 'Cookbook', caption: 'Browse and filter the library', icon: '📚' },
+  { id: 'recipe', label: 'Recipe', caption: 'Read and edit the selected recipe', icon: '🍳' },
+  { id: 'planner', label: 'Planner', caption: 'Collect recipes you want to make', icon: '📅' },
+  { id: 'shopping', label: 'Shopping List', caption: 'Generate groceries from the plan', icon: '🛒' },
+  { id: 'import', label: 'Import', caption: 'Create a recipe from a URL', icon: '＋' },
 ]
 
 const recipePlaceholderImage = '/recipe-placeholder.svg'
@@ -538,34 +530,9 @@ function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Prototype Stack</p>
-          <h1>Recipe Cabinet</h1>
-        </div>
-        <div className="topbar__meta">
-          <span>React + TypeScript + Vite</span>
-          <span>Tabbed single-page prototype</span>
-          {stateError ? <span>{stateError}</span> : null}
-        </div>
+        <h1>Recipe Cabinet</h1>
+        {stateError ? <p className="topbar__status">{stateError}</p> : null}
       </header>
-
-      <section className="hero-panel">
-        <div className="hero-panel__copy">
-          <p className="eyebrow">Feature Shortlist</p>
-          <h2>Separate views for the core jobs this app needs to handle.</h2>
-          <p>
-            The product feels cleaner when browsing, cooking, planning, and shopping
-            are distinct destinations instead of one crowded dashboard.
-          </p>
-        </div>
-        <div className="feature-grid">
-          {featureIdeas.map((feature) => (
-            <article key={feature} className="feature-card">
-              {feature}
-            </article>
-          ))}
-        </div>
-      </section>
 
       <nav className="tabs" aria-label="Primary views">
         {views.map((view) => (
@@ -573,9 +540,14 @@ function App() {
             key={view.id}
             className={activeView === view.id ? 'tab tab--active' : 'tab'}
             onClick={() => setActiveView(view.id)}
+            aria-label={`${view.label}: ${view.caption}`}
+            title={view.label}
           >
-            <strong>{view.label}</strong>
-            <span>{view.caption}</span>
+            <span className="tab__icon" aria-hidden="true">
+              {view.icon}
+            </span>
+            <strong className="tab__label">{view.label}</strong>
+            <span className="tab__caption">{view.caption}</span>
           </button>
         ))}
       </nav>

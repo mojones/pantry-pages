@@ -18,18 +18,12 @@
 }
 
 .topbar {
-  align-items: end;
-  margin-bottom: 24px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
-.topbar__meta {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: end;
-}
-
-.topbar__meta span,
+.topbar__status,
 .badge,
 .tag,
 .source-tag,
@@ -42,7 +36,6 @@
   font-size: 0.9rem;
 }
 
-.hero-panel,
 .panel,
 .tabs {
   border: 1px solid var(--line);
@@ -52,15 +45,6 @@
   backdrop-filter: blur(14px);
 }
 
-.hero-panel {
-  display: grid;
-  grid-template-columns: 1.1fr 1.4fr;
-  gap: 24px;
-  padding: 28px;
-  margin-bottom: 20px;
-}
-
-.feature-grid,
 .grocery-grid,
 .detail-grid,
 .recipe-grid,
@@ -69,21 +53,8 @@
   gap: 20px;
 }
 
-.feature-grid,
 .grocery-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.feature-card {
-  min-height: 92px;
-  padding: 18px;
-  border-radius: 22px;
-  background:
-    linear-gradient(135deg, rgba(242, 98, 70, 0.12), rgba(242, 175, 70, 0.18)),
-    #fffdf8;
-  border: 1px solid rgba(177, 95, 42, 0.16);
-  font-weight: 600;
-  line-height: 1.45;
 }
 
 .tabs {
@@ -100,9 +71,27 @@
   border-radius: 22px;
   text-align: left;
   cursor: pointer;
+  align-items: center;
+  justify-items: start;
+  min-height: 84px;
 }
 
-.tab span {
+.tab__icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: rgba(125, 84, 44, 0.08);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.tab__label {
+  line-height: 1.1;
+}
+
+.tab__caption {
   color: var(--muted);
   font-size: 0.82rem;
 }
@@ -115,8 +104,12 @@
   border-color: transparent;
 }
 
-.tab--active span {
+.tab--active .tab__caption {
   color: rgba(255, 255, 255, 0.82);
+}
+
+.tab--active .tab__icon {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .view-shell {
@@ -170,7 +163,6 @@ h4 {
   letter-spacing: 0.08em;
 }
 
-.hero-panel__copy p:last-child,
 .summary,
 .planner-banner p {
   max-width: 62ch;
@@ -609,7 +601,6 @@ textarea {
 }
 
 @media (max-width: 1180px) {
-  .hero-panel,
   .feature-grid,
   .recipe-grid,
   .planner-list,
@@ -624,6 +615,10 @@ textarea {
 @media (max-width: 720px) {
   .shell {
     padding: 18px;
+  }
+
+  .tabs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .topbar,
@@ -643,7 +638,27 @@ textarea {
     justify-content: stretch;
   }
 
-  .topbar__meta {
-    justify-content: start;
+  .tabs {
+    gap: 8px;
+    padding: 8px;
+    margin-bottom: 16px;
+  }
+
+  .tab {
+    min-height: 58px;
+    padding: 10px 0;
+    justify-items: center;
+  }
+
+  .tab__icon {
+    width: auto;
+    height: auto;
+    background: transparent;
+    font-size: 1.3rem;
+  }
+
+  .tab__label,
+  .tab__caption {
+    display: none;
   }
 }
