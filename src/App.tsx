@@ -21,6 +21,12 @@ type PersistedAppState = {
   plannedRecipes: PlannedRecipe[]
   recipeNotes: Record<string, string>
   manualShoppingItems: string[]
+  completedShoppingItems: string[]
+}
+
+type GroceryListItem = {
+  key: string
+  item: string
 }
 
 const initialPlannedRecipes: PlannedRecipe[] = []
@@ -215,6 +221,7 @@ function App() {
   const [importStatus, setImportStatus] = useState<'idle' | 'loading'>('idle')
   const [lastImportedRecipeTitle, setLastImportedRecipeTitle] = useState('')
   const [manualShoppingItems, setManualShoppingItems] = useState<string[]>([])
+  const [completedShoppingItems, setCompletedShoppingItems] = useState<string[]>([])
   const [manualShoppingInput, setManualShoppingInput] = useState('')
   const [stateReady, setStateReady] = useState(false)
   const [stateError, setStateError] = useState('')
@@ -249,6 +256,7 @@ function App() {
           ),
         )
         setManualShoppingItems(payload.manualShoppingItems)
+        setCompletedShoppingItems(payload.completedShoppingItems)
         setSelectedRecipeId((currentRecipeId) =>
           availableRecipeIds.has(currentRecipeId) ? currentRecipeId : mergedRecipes[0].id,
         )
@@ -299,6 +307,7 @@ function App() {
               plannedRecipes: plannedRecipesState,
               recipeNotes: persistedNotes,
               manualShoppingItems,
+              completedShoppingItems,
             } satisfies PersistedAppState),
           })
 
@@ -324,7 +333,7 @@ function App() {
       ignore = true
       window.clearTimeout(timeoutId)
     }
-  }, [manualShoppingItems, plannedRecipesState, recipeLibrary, recipeNotes, stateReady])
+  }, [completedShoppingItems, manualShoppingItems, plannedRecipesState, recipeLibrary, recipeNotes, stateReady])
 
   const allSections = ['All', ...new Set(recipeLibrary.map((recipe) => recipe.section))]
 
@@ -366,32 +375,55 @@ function App() {
         Boolean(plannedRecipe),
     )
 
-  const groceryByAisle = plannedRecipes.reduce<Record<string, string[]>>((groups, plannedRecipe) => {
+  const groceryByAisle = plannedRecipes.reduce<Record<string, GroceryListItem[]>>((groups, plannedRecipe) => {
     plannedRecipe.recipe.ingredients
       .filter(
         (ingredient) =>
           !plannedRecipe.excludedIngredientKeys.includes(ingredientKey(ingredient)),
       )
-      .forEach((ingredient) => {
+      .forEach((ingredient, ingredientIndex) => {
         if (!groups[ingredient.aisle]) {
           groups[ingredient.aisle] = []
         }
 
-        groups[ingredient.aisle].push(formatIngredient(ingredient))
+        groups[ingredient.aisle].push({
+          key: `recipe:${plannedRecipe.recipe.id}:${ingredientIndex}:${ingredientKey(ingredient)}`,
+          item: formatIngredient(ingredient),
+        })
       })
 
     return groups
   }, {})
 
   manualShoppingItems
-    .map((item) => splitIngredient(item))
-    .forEach((ingredient) => {
+    .map((item, itemIndex) => ({ ingredient: splitIngredient(item), itemIndex }))
+    .forEach(({ ingredient, itemIndex }) => {
       if (!groceryByAisle[ingredient.aisle]) {
         groceryByAisle[ingredient.aisle] = []
       }
 
-      groceryByAisle[ingredient.aisle].push(formatIngredient(ingredient))
+      groceryByAisle[ingredient.aisle].push({
+        key: `manual:${itemIndex}:${ingredientKey(ingredient)}`,
+        item: formatIngredient(ingredient),
+      })
     })
+
+  const visibleGroceryByAisle = Object.fromEntries(
+    Object.entries(groceryByAisle)
+      .map(
+        ([aisle, items]): [string, GroceryListItem[]] => [
+          aisle,
+          items.filter((item) => !completedShoppingItems.includes(item.key)),
+        ],
+      )
+      .filter(([, items]) => items.length > 0),
+  ) as Record<string, GroceryListItem[]>
+
+  const doneShoppingItems = Object.entries(groceryByAisle).flatMap(([aisle, items]) =>
+    items
+      .filter((item) => completedShoppingItems.includes(item.key))
+      .map((item) => ({ ...item, aisle })),
+  )
 
   function selectRecipe(recipeId: string) {
     setSelectedRecipeId(recipeId)
@@ -517,14 +549,16 @@ function App() {
     setManualShoppingInput('')
   }
 
-  function removeManualShoppingItem(index: number) {
-    setManualShoppingItems((currentItems) =>
-      currentItems.filter((_, itemIndex) => itemIndex !== index),
+  function markShoppingItemDone(itemKey: string) {
+    setCompletedShoppingItems((currentItems) =>
+      currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
     )
   }
 
-  function clearManualShoppingItems() {
-    setManualShoppingItems([])
+  function undoCompletedShoppingItem(itemKey: string) {
+    setCompletedShoppingItems((currentItems) =>
+      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+    )
   }
 
   return (
@@ -839,7 +873,7 @@ function App() {
                 <p className="eyebrow">Shopping List View</p>
                 <h3>Generated From Planned Recipes</h3>
               </div>
-              <span className="badge">{Object.keys(groceryByAisle).length} aisles</span>
+              <span className="badge">{Object.keys(visibleGroceryByAisle).length} aisles</span>
             </div>
 
             <div className="import-layout shopping-tools">
@@ -866,52 +900,22 @@ function App() {
                   </button>
                 </div>
               </div>
-
-              <article className="import-card import-card--note">
-                <div className="panel__header">
-                  <div>
-                    <p className="eyebrow">Saved Extras</p>
-                    <h4>Manual Shopping Items</h4>
-                  </div>
-                  <button
-                    className="link-button"
-                    onClick={clearManualShoppingItems}
-                    disabled={manualShoppingItems.length === 0}
-                  >
-                    Clear Extras
-                  </button>
-                </div>
-
-                {manualShoppingItems.length > 0 ? (
-                  <ul className="manual-shopping-list">
-                    {manualShoppingItems.map((item, index) => (
-                      <li key={`${item}-${index}`}>
-                        <span>{item}</span>
-                        <button
-                          className="link-button"
-                          onClick={() => removeManualShoppingItem(index)}
-                        >
-                          Remove
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="import-message">No extra shopping items yet.</p>
-                )}
-              </article>
             </div>
 
             <div className="grocery-grid">
-              {Object.entries(groceryByAisle).length > 0 ? (
-                Object.entries(groceryByAisle).map(([aisle, items]) => (
+              {Object.entries(visibleGroceryByAisle).length > 0 ? (
+                Object.entries(visibleGroceryByAisle).map(([aisle, items]) => (
                   <article key={aisle} className="grocery-group">
                     <h4>{aisle}</h4>
-                    <ul className="check-list">
+                    <ul className="shopping-list">
                       {items.map((item) => (
-                        <li key={`${aisle}-${item}`}>
-                          <input type="checkbox" />
-                          <span>{item}</span>
+                        <li key={item.key}>
+                          <button
+                            className="shopping-list__item"
+                            onClick={() => markShoppingItemDone(item.key)}
+                          >
+                            <span>{item.item}</span>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -924,6 +928,33 @@ function App() {
                 </article>
               )}
             </div>
+
+            {doneShoppingItems.length > 0 ? (
+              <article className="grocery-group grocery-group--done">
+                <div className="grocery-group__header">
+                  <h4>Done</h4>
+                  <span className="badge">{doneShoppingItems.length} items</span>
+                </div>
+                <ul className="done-list">
+                  {doneShoppingItems.map((item) => (
+                    <li key={item.key}>
+                      <div className="done-list__item">
+                        <div className="done-list__copy">
+                          <span>{item.item}</span>
+                          <small>{item.aisle}</small>
+                        </div>
+                        <button
+                          className="link-button done-list__undo"
+                          onClick={() => undoCompletedShoppingItem(item.key)}
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ) : null}
           </section>
         ) : null}
 

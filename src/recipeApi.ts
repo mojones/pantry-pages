@@ -35,6 +35,7 @@ type PersistedAppState = {
   plannedRecipes: PersistedPlannerEntry[]
   recipeNotes: Record<string, string>
   manualShoppingItems: string[]
+  completedShoppingItems: string[]
 }
 
 type MiddlewareStack = {
@@ -53,6 +54,7 @@ const defaultPersistedState: PersistedAppState = {
   plannedRecipes: [],
   recipeNotes: {},
   manualShoppingItems: [],
+  completedShoppingItems: [],
 }
 
 const dataDirectory = process.env.DATA_DIR?.trim() || path.join(process.cwd(), 'data')
@@ -184,6 +186,7 @@ function normalizePersistedState(value: unknown): PersistedAppState {
       : [],
     recipeNotes: normalizeRecipeNotes(value.recipeNotes),
     manualShoppingItems: normalizeStringArray(value.manualShoppingItems).map((item) => item.trim()).filter(Boolean),
+    completedShoppingItems: normalizeStringArray(value.completedShoppingItems).map((item) => item.trim()).filter(Boolean),
   }
 }
 

@@ -314,12 +314,6 @@ textarea {
   margin-bottom: 22px;
 }
 
-.import-card--note {
-  background:
-    linear-gradient(135deg, rgba(242, 98, 70, 0.08), rgba(242, 175, 70, 0.14)),
-    rgba(255, 252, 247, 0.94);
-}
-
 .import-message {
   padding: 14px 16px;
   border-radius: 18px;
@@ -422,26 +416,25 @@ textarea {
 
 .plain-list,
 .step-list,
-.check-list,
-.manual-shopping-list {
+.shopping-list,
+.done-list {
   margin: 0;
   padding: 0;
 }
 
 .plain-list,
-.check-list,
-.manual-shopping-list {
+.shopping-list,
+.done-list {
   list-style: none;
 }
 
 .plain-list li,
-.check-list li,
-.manual-shopping-list li {
+.shopping-list li,
+.done-list li {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(164, 136, 113, 0.18);
+  padding: 4px 0;
 }
 
 .step-list {
@@ -583,21 +576,71 @@ textarea {
   margin-bottom: 8px;
 }
 
+.grocery-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .empty-state {
   display: grid;
   gap: 8px;
 }
 
-.check-list li {
-  justify-content: start;
+.shopping-list__item,
+.done-list__item {
+  width: 100%;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
 }
 
-.check-list input {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  padding: 0;
+.shopping-list__item {
+  min-height: 0;
+  line-height: 1.25;
+}
+
+.shopping-list__item span {
+  display: block;
+  width: 100%;
+}
+
+.done-list__item {
+  align-items: start;
+}
+
+.done-list__copy {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+}
+
+.done-list__copy span {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+.done-list__copy small {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+.done-list__undo {
+  flex: none;
+  color: var(--accent);
+}
+
+.grocery-group--done {
+  margin-top: 20px;
+  background: linear-gradient(180deg, rgba(247, 243, 236, 0.96), rgba(241, 234, 223, 0.96));
 }
 
 @media (max-width: 1180px) {
