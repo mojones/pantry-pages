@@ -22,6 +22,7 @@ type PersistedAppState = {
   recipeNotes: Record<string, string>
   manualShoppingItems: string[]
   completedShoppingItems: string[]
+  removedShoppingItems: string[]
 }
 
 type GroceryListItem = {
@@ -222,6 +223,7 @@ function App() {
   const [lastImportedRecipeTitle, setLastImportedRecipeTitle] = useState('')
   const [manualShoppingItems, setManualShoppingItems] = useState<string[]>([])
   const [completedShoppingItems, setCompletedShoppingItems] = useState<string[]>([])
+  const [removedShoppingItems, setRemovedShoppingItems] = useState<string[]>([])
   const [manualShoppingInput, setManualShoppingInput] = useState('')
   const [stateReady, setStateReady] = useState(false)
   const [stateError, setStateError] = useState('')
@@ -257,6 +259,7 @@ function App() {
         )
         setManualShoppingItems(payload.manualShoppingItems)
         setCompletedShoppingItems(payload.completedShoppingItems)
+        setRemovedShoppingItems(payload.removedShoppingItems)
         setSelectedRecipeId((currentRecipeId) =>
           availableRecipeIds.has(currentRecipeId) ? currentRecipeId : mergedRecipes[0].id,
         )
@@ -308,6 +311,7 @@ function App() {
               recipeNotes: persistedNotes,
               manualShoppingItems,
               completedShoppingItems,
+              removedShoppingItems,
             } satisfies PersistedAppState),
           })
 
@@ -333,7 +337,15 @@ function App() {
       ignore = true
       window.clearTimeout(timeoutId)
     }
-  }, [completedShoppingItems, manualShoppingItems, plannedRecipesState, recipeLibrary, recipeNotes, stateReady])
+  }, [
+    completedShoppingItems,
+    manualShoppingItems,
+    plannedRecipesState,
+    recipeLibrary,
+    recipeNotes,
+    removedShoppingItems,
+    stateReady,
+  ])
 
   const allSections = ['All', ...new Set(recipeLibrary.map((recipe) => recipe.section))]
 
@@ -408,12 +420,19 @@ function App() {
       })
     })
 
+  const completedShoppingItemSet = new Set(completedShoppingItems)
+  const removedShoppingItemSet = new Set(removedShoppingItems)
+
   const visibleGroceryByAisle = Object.fromEntries(
     Object.entries(groceryByAisle)
       .map(
         ([aisle, items]): [string, GroceryListItem[]] => [
           aisle,
-          items.filter((item) => !completedShoppingItems.includes(item.key)),
+          items.filter(
+            (item) =>
+              !completedShoppingItemSet.has(item.key) &&
+              !removedShoppingItemSet.has(item.key),
+          ),
         ],
       )
       .filter(([, items]) => items.length > 0),
@@ -421,7 +440,11 @@ function App() {
 
   const doneShoppingItems = Object.entries(groceryByAisle).flatMap(([aisle, items]) =>
     items
-      .filter((item) => completedShoppingItems.includes(item.key))
+      .filter(
+        (item) =>
+          completedShoppingItemSet.has(item.key) &&
+          !removedShoppingItemSet.has(item.key),
+      )
       .map((item) => ({ ...item, aisle })),
   )
 
@@ -433,6 +456,11 @@ function App() {
     )
 
     setCompletedShoppingItems((currentItems) => {
+      const filteredItems = currentItems.filter((itemKey) => validItemKeys.has(itemKey))
+      return filteredItems.length === currentItems.length ? currentItems : filteredItems
+    })
+
+    setRemovedShoppingItems((currentItems) => {
       const filteredItems = currentItems.filter((itemKey) => validItemKeys.has(itemKey))
       return filteredItems.length === currentItems.length ? currentItems : filteredItems
     })
@@ -583,8 +611,13 @@ function App() {
       return
     }
 
-    setCompletedShoppingItems((currentItems) => [
-      ...currentItems.filter((itemKey) => !visibleItemKeys.includes(itemKey)),
+    const visibleItemKeySet = new Set(visibleItemKeys)
+
+    setCompletedShoppingItems((currentItems) =>
+      currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
+    )
+    setRemovedShoppingItems((currentItems) => [
+      ...currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
       ...visibleItemKeys,
     ])
   }
@@ -595,9 +628,14 @@ function App() {
     }
 
     const doneItemKeys = doneShoppingItems.map((item) => item.key)
+    const doneItemKeySet = new Set(doneItemKeys)
     setCompletedShoppingItems((currentItems) =>
-      currentItems.filter((itemKey) => !doneItemKeys.includes(itemKey)),
+      currentItems.filter((itemKey) => !doneItemKeySet.has(itemKey)),
     )
+    setRemovedShoppingItems((currentItems) => [
+      ...currentItems.filter((itemKey) => !doneItemKeySet.has(itemKey)),
+      ...doneItemKeys,
+    ])
   }
 
   return (
@@ -942,7 +980,7 @@ function App() {
               <div className="import-card shopping-bulk-actions">
                 <h4>List Actions</h4>
                 <p className="summary">
-                  Move everything into bought, or reset all bought items back into need.
+                  Remove everything from either list once you no longer need it on this trip.
                 </p>
                 <button
                   className="action-button"
