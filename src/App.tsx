@@ -425,6 +425,19 @@ function App() {
       .map((item) => ({ ...item, aisle })),
   )
 
+  useEffect(() => {
+    const validItemKeys = new Set(
+      Object.values(groceryByAisle)
+        .flat()
+        .map((item) => item.key),
+    )
+
+    setCompletedShoppingItems((currentItems) => {
+      const filteredItems = currentItems.filter((itemKey) => validItemKeys.has(itemKey))
+      return filteredItems.length === currentItems.length ? currentItems : filteredItems
+    })
+  }, [groceryByAisle])
+
   function selectRecipe(recipeId: string) {
     setSelectedRecipeId(recipeId)
     setRecipeScale(1)
@@ -558,6 +571,32 @@ function App() {
   function undoCompletedShoppingItem(itemKey: string) {
     setCompletedShoppingItems((currentItems) =>
       currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+    )
+  }
+
+  function clearNeedShoppingItems() {
+    const visibleItemKeys = Object.values(visibleGroceryByAisle)
+      .flat()
+      .map((item) => item.key)
+
+    if (visibleItemKeys.length === 0) {
+      return
+    }
+
+    setCompletedShoppingItems((currentItems) => [
+      ...currentItems.filter((itemKey) => !visibleItemKeys.includes(itemKey)),
+      ...visibleItemKeys,
+    ])
+  }
+
+  function clearBoughtShoppingItems() {
+    if (doneShoppingItems.length === 0) {
+      return
+    }
+
+    const doneItemKeys = doneShoppingItems.map((item) => item.key)
+    setCompletedShoppingItems((currentItems) =>
+      currentItems.filter((itemKey) => !doneItemKeys.includes(itemKey)),
     )
   }
 
@@ -871,7 +910,7 @@ function App() {
             <div className="panel__header">
               <div>
                 <p className="eyebrow">Shopping List View</p>
-                <h3>Generated From Planned Recipes</h3>
+                <h3>Need To Buy</h3>
               </div>
               <span className="badge">{Object.keys(visibleGroceryByAisle).length} aisles</span>
             </div>
@@ -899,6 +938,26 @@ function App() {
                     Add Items
                   </button>
                 </div>
+              </div>
+              <div className="import-card shopping-bulk-actions">
+                <h4>List Actions</h4>
+                <p className="summary">
+                  Move everything into bought, or reset all bought items back into need.
+                </p>
+                <button
+                  className="action-button"
+                  onClick={clearNeedShoppingItems}
+                  disabled={Object.keys(visibleGroceryByAisle).length === 0}
+                >
+                  Clear Need List
+                </button>
+                <button
+                  className="link-button"
+                  onClick={clearBoughtShoppingItems}
+                  disabled={doneShoppingItems.length === 0}
+                >
+                  Clear Bought List
+                </button>
               </div>
             </div>
 
@@ -932,7 +991,7 @@ function App() {
             {doneShoppingItems.length > 0 ? (
               <article className="grocery-group grocery-group--done">
                 <div className="grocery-group__header">
-                  <h4>Done</h4>
+                  <h4>Bought</h4>
                   <span className="badge">{doneShoppingItems.length} items</span>
                 </div>
                 <ul className="done-list">
