@@ -1,0 +1,25 @@
+{
+  "name": "Pantry Pages",
+  "short_name": "Pantry Pages",
+  "description": "A recipe planner and shopping list app for weeknight cooking.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5efe2",
+  "theme_color": "#7a4b2a",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
