@@ -225,7 +225,7 @@ function App() {
   const [completedShoppingItems, setCompletedShoppingItems] = useState<string[]>([])
   const [removedShoppingItems, setRemovedShoppingItems] = useState<string[]>([])
   const [manualShoppingInput, setManualShoppingInput] = useState('')
-  const [stateReady, setStateReady] = useState(false)
+  const [stateLoaded, setStateLoaded] = useState(false)
   const [stateError, setStateError] = useState('')
 
   useEffect(() => {
@@ -263,16 +263,13 @@ function App() {
         setSelectedRecipeId((currentRecipeId) =>
           availableRecipeIds.has(currentRecipeId) ? currentRecipeId : mergedRecipes[0].id,
         )
+        setStateLoaded(true)
         setStateError('')
       } catch (error) {
         if (!ignore) {
           setStateError(
             error instanceof Error ? error.message : 'Unable to load saved app state.',
           )
-        }
-      } finally {
-        if (!ignore) {
-          setStateReady(true)
         }
       }
     }
@@ -285,7 +282,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!stateReady) {
+    if (!stateLoaded) {
       return
     }
 
@@ -344,7 +341,7 @@ function App() {
     recipeLibrary,
     recipeNotes,
     removedShoppingItems,
-    stateReady,
+    stateLoaded,
   ])
 
   const allSections = ['All', ...new Set(recipeLibrary.map((recipe) => recipe.section))]
