@@ -472,6 +472,19 @@ function App() {
       return counts
     }, {})
 
+  const curatedFrequentSet = new Set(
+    curatedFrequentItems.map((item) => item.trim().toLowerCase()).filter(Boolean),
+  )
+
+  const curatedFrequentList = Array.from(curatedFrequentSet).map((normalized) => ({
+    normalized,
+    label: frequentCounts[normalized]?.label ?? normalized,
+    count: frequentCounts[normalized]?.count ?? 0,
+    isCurated: true,
+  }))
+
+  const historyFrequentList = Object.entries(frequentCounts)
+    .filter(([normalized, entry]) => entry.count >= 2 && !curatedFrequentSet.has(normalized))
   const frequentShoppingItems = Object.entries(frequentCounts)
     .filter(([normalized, entry]) =>
       entry.count >= 2 || curatedFrequentItems.some((item) => item.trim().toLowerCase() === normalized),
@@ -480,6 +493,15 @@ function App() {
       normalized,
       label: entry.label,
       count: entry.count,
+      isCurated: false,
+    }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
+    .slice(0, 12)
+
+  const frequentShoppingItems = [...curatedFrequentList, ...historyFrequentList].sort(
+    (left, right) => right.count - left.count || left.label.localeCompare(right.label),
+  )
+
       isCurated: curatedFrequentItems.some((item) => item.trim().toLowerCase() === normalized),
     }))
     .concat(
@@ -1118,6 +1140,11 @@ function App() {
                 <button className="action-button action-button--secondary" onClick={saveCuratedFrequentItems}>
                   Save Always Include List
                 </button>
+                {curatedFrequentItems.length > 0 ? (
+                  <p className="summary">
+                    Always include: {curatedFrequentItems.join(', ')}
+                  </p>
+                ) : null}
                 {frequentShoppingItems.length > 0 ? (
                   <>
                     <button className="action-button" onClick={addAllFrequentShoppingItems}>
