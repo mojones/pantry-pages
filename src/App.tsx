@@ -653,6 +653,21 @@ function App() {
     })
   }
 
+  function addAllFrequentShoppingItems() {
+    if (frequentShoppingItems.length === 0) {
+      return
+    }
+
+    setManualShoppingItems((currentItems) => {
+      const existingItems = new Set(currentItems.map((item) => item.trim().toLowerCase()))
+      const itemsToAdd = frequentShoppingItems
+        .map((item) => item.label.trim())
+        .filter((item) => item && !existingItems.has(item.toLowerCase()))
+
+      return itemsToAdd.length > 0 ? [...currentItems, ...itemsToAdd] : currentItems
+    })
+  }
+
   function saveCuratedFrequentItems() {
     const newItems = curatedFrequentInput
       .split('\n')
@@ -1104,6 +1119,20 @@ function App() {
                   Save Always Include List
                 </button>
                 {frequentShoppingItems.length > 0 ? (
+                  <>
+                    <button className="action-button" onClick={addAllFrequentShoppingItems}>
+                      Add All Frequent Items
+                    </button>
+                    <ul className="plain-list">
+                      {frequentShoppingItems.map((item) => (
+                        <li key={item.normalized}>
+                          <button className="link-button" onClick={() => addFrequentShoppingItem(item.label)}>
+                            Add {item.label} {item.count > 0 ? `(${item.count}x)` : item.isCurated ? '(Always)' : ''}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                   <ul className="plain-list">
                     {frequentShoppingItems.map((item) => (
                       <li key={item.normalized}>

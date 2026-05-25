@@ -37,6 +37,8 @@ type PersistedAppState = {
   manualShoppingItems: string[]
   completedShoppingItems: string[]
   removedShoppingItems: string[]
+  shoppingHistoryItems: string[]
+  curatedFrequentItems: string[]
 }
 
 type MiddlewareStack = {
@@ -57,6 +59,8 @@ const defaultPersistedState: PersistedAppState = {
   manualShoppingItems: [],
   completedShoppingItems: [],
   removedShoppingItems: [],
+  shoppingHistoryItems: [],
+  curatedFrequentItems: [],
 }
 
 const dataDirectory = process.env.DATA_DIR?.trim() || path.join(process.cwd(), 'data')
@@ -190,6 +194,8 @@ function normalizePersistedState(value: unknown): PersistedAppState {
     manualShoppingItems: normalizeStringArray(value.manualShoppingItems).map((item) => item.trim()).filter(Boolean),
     completedShoppingItems: normalizeStringArray(value.completedShoppingItems).map((item) => item.trim()).filter(Boolean),
     removedShoppingItems: normalizeStringArray(value.removedShoppingItems).map((item) => item.trim()).filter(Boolean),
+    shoppingHistoryItems: normalizeStringArray(value.shoppingHistoryItems).map((item) => item.trim()).filter(Boolean),
+    curatedFrequentItems: normalizeStringArray(value.curatedFrequentItems).map((item) => item.trim()).filter(Boolean),
   }
 }
 
