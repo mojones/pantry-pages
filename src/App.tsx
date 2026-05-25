@@ -23,6 +23,8 @@ type PersistedAppState = {
   manualShoppingItems: string[]
   completedShoppingItems: string[]
   removedShoppingItems: string[]
+  shoppingHistoryItems: string[]
+  curatedFrequentItems: string[]
 }
 
 type GroceryListItem = {
@@ -225,6 +227,9 @@ function App() {
   const [completedShoppingItems, setCompletedShoppingItems] = useState<string[]>([])
   const [removedShoppingItems, setRemovedShoppingItems] = useState<string[]>([])
   const [manualShoppingInput, setManualShoppingInput] = useState('')
+  const [shoppingHistoryItems, setShoppingHistoryItems] = useState<string[]>([])
+  const [curatedFrequentItems, setCuratedFrequentItems] = useState<string[]>([])
+  const [curatedFrequentInput, setCuratedFrequentInput] = useState('')
   const [stateLoaded, setStateLoaded] = useState(false)
   const [stateError, setStateError] = useState('')
 
@@ -260,6 +265,10 @@ function App() {
         setManualShoppingItems(payload.manualShoppingItems)
         setCompletedShoppingItems(payload.completedShoppingItems)
         setRemovedShoppingItems(payload.removedShoppingItems)
+        setShoppingHistoryItems(payload.shoppingHistoryItems ?? [])
+        const savedCuratedFrequentItems = payload.curatedFrequentItems ?? []
+        setCuratedFrequentItems(savedCuratedFrequentItems)
+        setCuratedFrequentInput(savedCuratedFrequentItems.join('\n'))
         setSelectedRecipeId((currentRecipeId) =>
           availableRecipeIds.has(currentRecipeId) ? currentRecipeId : mergedRecipes[0].id,
         )
@@ -309,6 +318,8 @@ function App() {
               manualShoppingItems,
               completedShoppingItems,
               removedShoppingItems,
+              shoppingHistoryItems,
+              curatedFrequentItems,
             } satisfies PersistedAppState),
           })
 
@@ -341,6 +352,8 @@ function App() {
     recipeLibrary,
     recipeNotes,
     removedShoppingItems,
+    shoppingHistoryItems,
+    curatedFrequentItems,
     stateLoaded,
   ])
 
@@ -444,6 +457,44 @@ function App() {
       )
       .map((item) => ({ ...item, aisle })),
   )
+
+  const frequentCounts = shoppingHistoryItems.reduce<Record<string, { count: number; label: string }>>((counts, item) => {
+      const normalized = item.trim().toLowerCase()
+      if (!normalized) {
+        return counts
+      }
+
+      if (!counts[normalized]) {
+        counts[normalized] = { count: 0, label: item.trim() }
+      }
+
+      counts[normalized].count += 1
+      return counts
+    }, {})
+
+  const frequentShoppingItems = Object.entries(frequentCounts)
+    .filter(([normalized, entry]) =>
+      entry.count >= 2 || curatedFrequentItems.some((item) => item.trim().toLowerCase() === normalized),
+    )
+    .map(([normalized, entry]) => ({
+      normalized,
+      label: entry.label,
+      count: entry.count,
+      isCurated: curatedFrequentItems.some((item) => item.trim().toLowerCase() === normalized),
+    }))
+    .concat(
+      curatedFrequentItems
+        .map((item) => item.trim())
+        .filter((item) => item && !frequentCounts[item.toLowerCase()])
+        .map((item) => ({
+          normalized: item.toLowerCase(),
+          label: item,
+          count: 0,
+          isCurated: true,
+        })),
+    )
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
+    .slice(0, 12)
 
   useEffect(() => {
     const validItemKeys = new Set(
@@ -587,6 +638,57 @@ function App() {
     setManualShoppingInput('')
   }
 
+  function addFrequentShoppingItem(itemLabel: string) {
+    const normalized = itemLabel.trim().toLowerCase()
+    if (!normalized) {
+      return
+    }
+
+    setManualShoppingItems((currentItems) => {
+      if (currentItems.some((item) => item.trim().toLowerCase() === normalized)) {
+        return currentItems
+      }
+
+      return [...currentItems, itemLabel]
+    })
+  }
+
+  function addAllFrequentShoppingItems() {
+    if (frequentShoppingItems.length === 0) {
+      return
+    }
+
+    setManualShoppingItems((currentItems) => {
+      const existingItems = new Set(currentItems.map((item) => item.trim().toLowerCase()))
+      const itemsToAdd = frequentShoppingItems
+        .map((item) => item.label.trim())
+        .filter((item) => item && !existingItems.has(item.toLowerCase()))
+
+      return itemsToAdd.length > 0 ? [...currentItems, ...itemsToAdd] : currentItems
+    })
+  }
+
+  function saveCuratedFrequentItems() {
+    const newItems = curatedFrequentInput
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    setCuratedFrequentItems(newItems)
+  }
+
+  function saveItemsToHistory(itemLabels: string[]) {
+    const cleanedItems = itemLabels
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    if (cleanedItems.length === 0) {
+      return
+    }
+
+    setShoppingHistoryItems((currentItems) => [...currentItems, ...cleanedItems])
+  }
+
   function markShoppingItemDone(itemKey: string) {
     setCompletedShoppingItems((currentItems) =>
       currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
@@ -613,6 +715,11 @@ function App() {
     setCompletedShoppingItems((currentItems) =>
       currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
     )
+    saveItemsToHistory(
+      Object.values(visibleGroceryByAisle)
+        .flat()
+        .map((item) => item.item),
+    )
     setRemovedShoppingItems((currentItems) => [
       ...currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
       ...visibleItemKeys,
@@ -626,6 +733,7 @@ function App() {
 
     const doneItemKeys = doneShoppingItems.map((item) => item.key)
     const doneItemKeySet = new Set(doneItemKeys)
+    saveItemsToHistory(doneShoppingItems.map((item) => item.item))
     setCompletedShoppingItems((currentItems) =>
       currentItems.filter((itemKey) => !doneItemKeySet.has(itemKey)),
     )
@@ -993,6 +1101,43 @@ function App() {
                 >
                   Clear Bought List
                 </button>
+              </div>
+              <div className="import-card shopping-bulk-actions">
+                <h4>Frequently Bought</h4>
+                <p className="summary">
+                  Based on items from previous shopping lists you cleared.
+                </p>
+                <label className="searchbox">
+                  <span>Always include (one item per line)</span>
+                  <textarea
+                    value={curatedFrequentInput}
+                    onChange={(event) => setCuratedFrequentInput(event.target.value)}
+                    placeholder={'bananas\neggs\ncoffee beans'}
+                  />
+                </label>
+                <button className="action-button action-button--secondary" onClick={saveCuratedFrequentItems}>
+                  Save Always Include List
+                </button>
+                {frequentShoppingItems.length > 0 ? (
+                  <>
+                    <button className="action-button" onClick={addAllFrequentShoppingItems}>
+                      Add All Frequent Items
+                    </button>
+                    <ul className="plain-list">
+                      {frequentShoppingItems.map((item) => (
+                        <li key={item.normalized}>
+                          <button className="link-button" onClick={() => addFrequentShoppingItem(item.label)}>
+                            Add {item.label} {item.count > 0 ? `(${item.count}x)` : item.isCurated ? '(Always)' : ''}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="summary">
+                    Clear a few shopping lists and your frequent items will show up here.
+                  </p>
+                )}
               </div>
             </div>
 
