@@ -485,38 +485,16 @@ function App() {
 
   const historyFrequentList = Object.entries(frequentCounts)
     .filter(([normalized, entry]) => entry.count >= 2 && !curatedFrequentSet.has(normalized))
-  const frequentShoppingItems = Object.entries(frequentCounts)
-    .filter(([normalized, entry]) =>
-      entry.count >= 2 || curatedFrequentItems.some((item) => item.trim().toLowerCase() === normalized),
-    )
     .map(([normalized, entry]) => ({
       normalized,
       label: entry.label,
       count: entry.count,
       isCurated: false,
     }))
-    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
-    .slice(0, 12)
 
   const frequentShoppingItems = [...curatedFrequentList, ...historyFrequentList].sort(
     (left, right) => right.count - left.count || left.label.localeCompare(right.label),
-  )
-
-      isCurated: curatedFrequentItems.some((item) => item.trim().toLowerCase() === normalized),
-    }))
-    .concat(
-      curatedFrequentItems
-        .map((item) => item.trim())
-        .filter((item) => item && !frequentCounts[item.toLowerCase()])
-        .map((item) => ({
-          normalized: item.toLowerCase(),
-          label: item,
-          count: 0,
-          isCurated: true,
-        })),
-    )
-    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
-    .slice(0, 12)
+  ).slice(0, 12)
 
   useEffect(() => {
     const validItemKeys = new Set(
@@ -1160,15 +1138,6 @@ function App() {
                       ))}
                     </ul>
                   </>
-                  <ul className="plain-list">
-                    {frequentShoppingItems.map((item) => (
-                      <li key={item.normalized}>
-                        <button className="link-button" onClick={() => addFrequentShoppingItem(item.label)}>
-                          Add {item.label} {item.count > 0 ? `(${item.count}x)` : item.isCurated ? '(Always)' : ''}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
                 ) : (
                   <p className="summary">
                     Clear a few shopping lists and your frequent items will show up here.
