@@ -258,6 +258,19 @@ textarea {
   text-align: left;
 }
 
+.recipe-card,
+.planned-recipe-card {
+  content-visibility: auto;
+  contain-intrinsic-block-size: 560px;
+}
+
+.recipe-card > p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .planned-recipe-card {
   position: relative;
 }
