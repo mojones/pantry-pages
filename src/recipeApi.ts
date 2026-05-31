@@ -35,6 +35,7 @@ type PersistedAppState = {
   plannedRecipes: PersistedPlannerEntry[]
   recipeNotes: Record<string, string>
   manualShoppingItems: string[]
+  neededShoppingItems: string[]
   completedShoppingItems: string[]
   removedShoppingItems: string[]
   shoppingHistoryItems: string[]
@@ -57,6 +58,7 @@ const defaultPersistedState: PersistedAppState = {
   plannedRecipes: [],
   recipeNotes: {},
   manualShoppingItems: [],
+  neededShoppingItems: [],
   completedShoppingItems: [],
   removedShoppingItems: [],
   shoppingHistoryItems: [],
@@ -192,6 +194,7 @@ function normalizePersistedState(value: unknown): PersistedAppState {
       : [],
     recipeNotes: normalizeRecipeNotes(value.recipeNotes),
     manualShoppingItems: normalizeStringArray(value.manualShoppingItems).map((item) => item.trim()).filter(Boolean),
+    neededShoppingItems: normalizeStringArray(value.neededShoppingItems).map((item) => item.trim()).filter(Boolean),
     completedShoppingItems: normalizeStringArray(value.completedShoppingItems).map((item) => item.trim()).filter(Boolean),
     removedShoppingItems: normalizeStringArray(value.removedShoppingItems).map((item) => item.trim()).filter(Boolean),
     shoppingHistoryItems: normalizeStringArray(value.shoppingHistoryItems).map((item) => item.trim()).filter(Boolean),

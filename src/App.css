@@ -435,6 +435,7 @@ textarea {
 
 .plain-list,
 .step-list,
+.check-list,
 .shopping-list,
 .done-list {
   margin: 0;
@@ -442,12 +443,14 @@ textarea {
 }
 
 .plain-list,
+.check-list,
 .shopping-list,
 .done-list {
   list-style: none;
 }
 
 .plain-list li,
+.check-list li,
 .shopping-list li,
 .done-list li {
   display: flex;
@@ -603,6 +606,56 @@ textarea {
   margin-bottom: 8px;
 }
 
+.check-group {
+  margin-bottom: 20px;
+}
+
+.check-list {
+  display: grid;
+  gap: 8px;
+}
+
+.check-list li {
+  align-items: center;
+  min-height: 46px;
+  border-bottom: 1px solid rgba(164, 136, 113, 0.16);
+}
+
+.check-list li:last-child {
+  border-bottom: 0;
+}
+
+.check-list span {
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.check-list__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(72px, max-content));
+  gap: 8px;
+  flex: none;
+}
+
+.check-button {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.check-button--need {
+  border-color: transparent;
+  background: var(--accent);
+  color: white;
+}
+
+.check-button--got {
+  color: var(--muted);
+}
+
 .empty-state {
   display: grid;
   gap: 8px;
@@ -698,6 +751,15 @@ textarea {
   .modal-actions {
     grid-template-columns: 1fr;
     justify-content: stretch;
+  }
+
+  .check-list li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .check-list__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .tabs {

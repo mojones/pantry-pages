@@ -21,6 +21,7 @@ type PersistedAppState = {
   plannedRecipes: PlannedRecipe[]
   recipeNotes: Record<string, string>
   manualShoppingItems: string[]
+  neededShoppingItems: string[]
   completedShoppingItems: string[]
   removedShoppingItems: string[]
   shoppingHistoryItems: string[]
@@ -229,6 +230,7 @@ function App() {
   const [importStatus, setImportStatus] = useState<'idle' | 'loading'>('idle')
   const [lastImportedRecipeTitle, setLastImportedRecipeTitle] = useState('')
   const [manualShoppingItems, setManualShoppingItems] = useState<string[]>([])
+  const [neededShoppingItems, setNeededShoppingItems] = useState<string[]>([])
   const [completedShoppingItems, setCompletedShoppingItems] = useState<string[]>([])
   const [removedShoppingItems, setRemovedShoppingItems] = useState<string[]>([])
   const [manualShoppingInput, setManualShoppingInput] = useState('')
@@ -270,6 +272,7 @@ function App() {
           ),
         )
         setManualShoppingItems(payload.manualShoppingItems)
+        setNeededShoppingItems(payload.neededShoppingItems ?? [])
         setCompletedShoppingItems(payload.completedShoppingItems)
         setRemovedShoppingItems(payload.removedShoppingItems)
         setShoppingHistoryItems(payload.shoppingHistoryItems ?? [])
@@ -323,6 +326,7 @@ function App() {
               plannedRecipes: plannedRecipesState,
               recipeNotes: persistedNotes,
               manualShoppingItems,
+              neededShoppingItems,
               completedShoppingItems,
               removedShoppingItems,
               shoppingHistoryItems,
@@ -355,6 +359,7 @@ function App() {
   }, [
     completedShoppingItems,
     manualShoppingItems,
+    neededShoppingItems,
     plannedRecipesState,
     recipeLibrary,
     recipeNotes,
@@ -440,7 +445,17 @@ function App() {
     })
 
   const completedShoppingItemSet = new Set(completedShoppingItems)
+  const neededShoppingItemSet = new Set(neededShoppingItems)
   const removedShoppingItemSet = new Set(removedShoppingItems)
+
+  const checkShoppingItems = Object.values(groceryByAisle)
+    .flat()
+    .filter(
+      (item) =>
+        !neededShoppingItemSet.has(item.key) &&
+        !completedShoppingItemSet.has(item.key) &&
+        !removedShoppingItemSet.has(item.key),
+    )
 
   const visibleGroceryByAisle = Object.fromEntries(
     Object.entries(groceryByAisle)
@@ -449,6 +464,7 @@ function App() {
           aisle,
           items.filter(
             (item) =>
+              neededShoppingItemSet.has(item.key) &&
               !completedShoppingItemSet.has(item.key) &&
               !removedShoppingItemSet.has(item.key),
           ),
@@ -544,6 +560,11 @@ function App() {
     )
 
     setCompletedShoppingItems((currentItems) => {
+      const filteredItems = currentItems.filter((itemKey) => validItemKeys.has(itemKey))
+      return filteredItems.length === currentItems.length ? currentItems : filteredItems
+    })
+
+    setNeededShoppingItems((currentItems) => {
       const filteredItems = currentItems.filter((itemKey) => validItemKeys.has(itemKey))
       return filteredItems.length === currentItems.length ? currentItems : filteredItems
     })
@@ -780,6 +801,33 @@ function App() {
     setCompletedShoppingItems((currentItems) =>
       currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
     )
+    setNeededShoppingItems((currentItems) =>
+      currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
+    )
+  }
+
+  function markShoppingItemNeeded(itemKey: string) {
+    setNeededShoppingItems((currentItems) =>
+      currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
+    )
+    setCompletedShoppingItems((currentItems) =>
+      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+    )
+    setRemovedShoppingItems((currentItems) =>
+      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+    )
+  }
+
+  function markShoppingItemGot(itemKey: string) {
+    setNeededShoppingItems((currentItems) =>
+      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+    )
+    setCompletedShoppingItems((currentItems) =>
+      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+    )
+    setRemovedShoppingItems((currentItems) =>
+      currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
+    )
   }
 
   function clearNeedShoppingItems() {
@@ -794,6 +842,9 @@ function App() {
     const visibleItemKeySet = new Set(visibleItemKeys)
 
     setCompletedShoppingItems((currentItems) =>
+      currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
+    )
+    setNeededShoppingItems((currentItems) =>
       currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
     )
     saveItemsToHistory(
@@ -816,6 +867,9 @@ function App() {
     const doneItemKeySet = new Set(doneItemKeys)
     saveItemsToHistory(doneShoppingItems.map((item) => item.item))
     setCompletedShoppingItems((currentItems) =>
+      currentItems.filter((itemKey) => !doneItemKeySet.has(itemKey)),
+    )
+    setNeededShoppingItems((currentItems) =>
       currentItems.filter((itemKey) => !doneItemKeySet.has(itemKey)),
     )
     setRemovedShoppingItems((currentItems) => [
@@ -1148,9 +1202,9 @@ function App() {
             <div className="panel__header">
               <div>
                 <p className="eyebrow">Shopping List View</p>
-                <h3>Need To Buy</h3>
+                <h3>Check Then Buy</h3>
               </div>
-              <span className="badge">{Object.keys(visibleGroceryByAisle).length} aisles</span>
+              <span className="badge">{checkShoppingItems.length} to check</span>
             </div>
 
             <div className="import-layout shopping-tools">
@@ -1168,8 +1222,8 @@ function App() {
                   <div className="planner-hint">
                     <span>Manual items</span>
                     <p>
-                      These are parsed with the same ingredient logic as recipes, so they
-                      fall into the same aisle groups below.
+                      These go into the check list first, then move into the categorized
+                      grocery list when you mark them as needed.
                     </p>
                   </div>
                   <button className="action-button" onClick={addManualShoppingItems}>
@@ -1241,6 +1295,38 @@ function App() {
               </div>
             </div>
 
+            <article className="grocery-group check-group">
+              <div className="grocery-group__header">
+                <h4>Check Items</h4>
+                <span className="badge">{checkShoppingItems.length} items</span>
+              </div>
+              {checkShoppingItems.length > 0 ? (
+                <ul className="check-list">
+                  {checkShoppingItems.map((item) => (
+                    <li key={item.key}>
+                      <span>{item.item}</span>
+                      <div className="check-list__actions">
+                        <button
+                          className="check-button check-button--got"
+                          onClick={() => markShoppingItemGot(item.key)}
+                        >
+                          Got
+                        </button>
+                        <button
+                          className="check-button check-button--need"
+                          onClick={() => markShoppingItemNeeded(item.key)}
+                        >
+                          Need
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="summary">Everything has been checked for this trip.</p>
+              )}
+            </article>
+
             <div className="grocery-grid">
               {Object.entries(visibleGroceryByAisle).length > 0 ? (
                 Object.entries(visibleGroceryByAisle).map(([aisle, items]) => (
@@ -1262,8 +1348,8 @@ function App() {
                 ))
               ) : (
                 <article className="empty-state">
-                  <strong>No groceries yet.</strong>
-                  <p>Plan recipes and the shopping list will populate automatically.</p>
+                  <strong>No needed groceries yet.</strong>
+                  <p>Tap Need in the check list to move items here by aisle.</p>
                 </article>
               )}
             </div>
