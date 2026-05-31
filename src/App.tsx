@@ -70,6 +70,10 @@ function ingredientKey(ingredient: Ingredient) {
   return `${ingredient.item}__${ingredient.amount}`
 }
 
+function manualShoppingItemKey(item: string, itemIndex: number) {
+  return `manual:${itemIndex}:${ingredientKey(splitIngredient(item))}`
+}
+
 function formatIngredient(ingredient: Ingredient) {
   return ingredient.amount ? `${ingredient.amount} ${ingredient.item}` : ingredient.item
 }
@@ -430,7 +434,7 @@ function App() {
       }
 
       groceryByAisle[ingredient.aisle].push({
-        key: `manual:${itemIndex}:${ingredientKey(ingredient)}`,
+        key: manualShoppingItemKey(manualShoppingItems[itemIndex], itemIndex),
         item: formatIngredient(ingredient),
       })
     })
@@ -680,6 +684,25 @@ function App() {
       return
     }
 
+    const matchingManualItemKeys = manualShoppingItems
+      .map((item, itemIndex) => ({
+        normalized: item.trim().toLowerCase(),
+        key: manualShoppingItemKey(item, itemIndex),
+      }))
+      .filter((item) => item.normalized === normalized)
+      .map((item) => item.key)
+
+    if (matchingManualItemKeys.length > 0) {
+      const matchingManualItemKeySet = new Set(matchingManualItemKeys)
+
+      setCompletedShoppingItems((currentItems) =>
+        currentItems.filter((itemKey) => !matchingManualItemKeySet.has(itemKey)),
+      )
+      setRemovedShoppingItems((currentItems) =>
+        currentItems.filter((itemKey) => !matchingManualItemKeySet.has(itemKey)),
+      )
+    }
+
     setManualShoppingItems((currentItems) => {
       if (currentItems.some((item) => item.trim().toLowerCase() === normalized)) {
         return currentItems
@@ -694,10 +717,32 @@ function App() {
       return
     }
 
+    const frequentItemLabels = frequentShoppingItems
+      .map((item) => item.label.trim())
+      .filter(Boolean)
+    const frequentNormalizedItems = new Set(frequentItemLabels.map((item) => item.toLowerCase()))
+    const matchingManualItemKeys = manualShoppingItems
+      .map((item, itemIndex) => ({
+        normalized: item.trim().toLowerCase(),
+        key: manualShoppingItemKey(item, itemIndex),
+      }))
+      .filter((item) => frequentNormalizedItems.has(item.normalized))
+      .map((item) => item.key)
+
+    if (matchingManualItemKeys.length > 0) {
+      const matchingManualItemKeySet = new Set(matchingManualItemKeys)
+
+      setCompletedShoppingItems((currentItems) =>
+        currentItems.filter((itemKey) => !matchingManualItemKeySet.has(itemKey)),
+      )
+      setRemovedShoppingItems((currentItems) =>
+        currentItems.filter((itemKey) => !matchingManualItemKeySet.has(itemKey)),
+      )
+    }
+
     setManualShoppingItems((currentItems) => {
       const existingItems = new Set(currentItems.map((item) => item.trim().toLowerCase()))
-      const itemsToAdd = frequentShoppingItems
-        .map((item) => item.label.trim())
+      const itemsToAdd = frequentItemLabels
         .filter((item) => item && !existingItems.has(item.toLowerCase()))
 
       return itemsToAdd.length > 0 ? [...currentItems, ...itemsToAdd] : currentItems
