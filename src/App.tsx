@@ -30,6 +30,13 @@ type PersistedAppState = {
 
 type GroceryListItem = {
   key: string
+  keys: string[]
+  item: string
+  count: number
+}
+
+type RawGroceryListItem = {
+  key: string
   item: string
 }
 
@@ -77,6 +84,44 @@ function manualShoppingItemKey(item: string, itemIndex: number) {
 
 function formatIngredient(ingredient: Ingredient) {
   return ingredient.amount ? `${ingredient.amount} ${ingredient.item}` : ingredient.item
+}
+
+function normalizeShoppingItemLabel(item: string) {
+  return item.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+}
+
+function formatShoppingItemLabel(item: string) {
+  return normalizeShoppingItemLabel(item)
+}
+
+function groupGroceryItems(items: RawGroceryListItem[]) {
+  const groupedItems = new Map<string, GroceryListItem>()
+
+  items.forEach((item) => {
+    const normalizedItem = normalizeShoppingItemLabel(item.item)
+    if (!normalizedItem) {
+      return
+    }
+
+    const currentItem = groupedItems.get(normalizedItem)
+
+    if (currentItem) {
+      currentItem.keys.push(item.key)
+      currentItem.count += 1
+      return
+    }
+
+    groupedItems.set(normalizedItem, {
+      key: item.key,
+      keys: [item.key],
+      item: formatShoppingItemLabel(item.item),
+      count: 1,
+    })
+  })
+
+  return Array.from(groupedItems.values()).sort((left, right) =>
+    left.item.localeCompare(right.item),
+  )
 }
 
 function parseAmountToken(token: string): ParsedAmountToken | null {
@@ -411,7 +456,7 @@ function App() {
         Boolean(plannedRecipe),
     )
 
-  const groceryByAisle = plannedRecipes.reduce<Record<string, GroceryListItem[]>>((groups, plannedRecipe) => {
+  const groceryByAisle = plannedRecipes.reduce<Record<string, RawGroceryListItem[]>>((groups, plannedRecipe) => {
     plannedRecipe.recipe.ingredients
       .filter(
         (ingredient) =>
@@ -448,25 +493,29 @@ function App() {
   const neededShoppingItemSet = new Set(neededShoppingItems)
   const removedShoppingItemSet = new Set(removedShoppingItems)
 
-  const checkShoppingItems = Object.values(groceryByAisle)
-    .flat()
-    .filter(
+  const checkShoppingItems = groupGroceryItems(
+    Object.values(groceryByAisle)
+      .flat()
+      .filter(
       (item) =>
         !neededShoppingItemSet.has(item.key) &&
         !completedShoppingItemSet.has(item.key) &&
         !removedShoppingItemSet.has(item.key),
-    )
+      ),
+  )
 
   const visibleGroceryByAisle = Object.fromEntries(
     Object.entries(groceryByAisle)
       .map(
         ([aisle, items]): [string, GroceryListItem[]] => [
           aisle,
-          items.filter(
-            (item) =>
-              neededShoppingItemSet.has(item.key) &&
-              !completedShoppingItemSet.has(item.key) &&
-              !removedShoppingItemSet.has(item.key),
+          groupGroceryItems(
+            items.filter(
+              (item) =>
+                neededShoppingItemSet.has(item.key) &&
+                !completedShoppingItemSet.has(item.key) &&
+                !removedShoppingItemSet.has(item.key),
+            ),
           ),
         ],
       )
@@ -474,13 +523,13 @@ function App() {
   ) as Record<string, GroceryListItem[]>
 
   const doneShoppingItems = Object.entries(groceryByAisle).flatMap(([aisle, items]) =>
-    items
-      .filter(
+    groupGroceryItems(
+      items.filter(
         (item) =>
           completedShoppingItemSet.has(item.key) &&
           !removedShoppingItemSet.has(item.key),
-      )
-      .map((item) => ({ ...item, aisle })),
+      ),
+    ).map((item) => ({ ...item, aisle })),
   )
 
   const frequentCounts = shoppingHistoryItems.reduce<Record<string, { count: number; label: string }>>((counts, item) => {
@@ -791,47 +840,53 @@ function App() {
     setShoppingHistoryItems((currentItems) => [...currentItems, ...cleanedItems])
   }
 
-  function markShoppingItemDone(itemKey: string) {
+  function markShoppingItemsDone(itemKeys: string[]) {
     setCompletedShoppingItems((currentItems) =>
-      currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
+      Array.from(new Set([...currentItems, ...itemKeys])),
     )
   }
 
-  function undoCompletedShoppingItem(itemKey: string) {
+  function undoCompletedShoppingItems(itemKeys: string[]) {
+    const itemKeySet = new Set(itemKeys)
+
     setCompletedShoppingItems((currentItems) =>
-      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+      currentItems.filter((currentItemKey) => !itemKeySet.has(currentItemKey)),
     )
     setNeededShoppingItems((currentItems) =>
-      currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
+      Array.from(new Set([...currentItems, ...itemKeys])),
     )
   }
 
-  function markShoppingItemNeeded(itemKey: string) {
+  function markShoppingItemsNeeded(itemKeys: string[]) {
+    const itemKeySet = new Set(itemKeys)
+
     setNeededShoppingItems((currentItems) =>
-      currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
+      Array.from(new Set([...currentItems, ...itemKeys])),
     )
     setCompletedShoppingItems((currentItems) =>
-      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+      currentItems.filter((currentItemKey) => !itemKeySet.has(currentItemKey)),
     )
     setRemovedShoppingItems((currentItems) =>
-      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+      currentItems.filter((currentItemKey) => !itemKeySet.has(currentItemKey)),
     )
   }
 
-  function markShoppingItemGot(itemKey: string) {
+  function markShoppingItemsGot(itemKeys: string[]) {
+    const itemKeySet = new Set(itemKeys)
+
     setNeededShoppingItems((currentItems) =>
-      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+      currentItems.filter((currentItemKey) => !itemKeySet.has(currentItemKey)),
     )
     setCompletedShoppingItems((currentItems) =>
-      currentItems.filter((currentItemKey) => currentItemKey !== itemKey),
+      currentItems.filter((currentItemKey) => !itemKeySet.has(currentItemKey)),
     )
     setRemovedShoppingItems((currentItems) =>
-      currentItems.includes(itemKey) ? currentItems : [...currentItems, itemKey],
+      Array.from(new Set([...currentItems, ...itemKeys])),
     )
   }
 
   function clearCheckShoppingItems() {
-    const checkItemKeys = checkShoppingItems.map((item) => item.key)
+    const checkItemKeys = checkShoppingItems.flatMap((item) => item.keys)
 
     if (checkItemKeys.length === 0) {
       return
@@ -854,7 +909,7 @@ function App() {
   function clearNeedShoppingItems() {
     const visibleItemKeys = Object.values(visibleGroceryByAisle)
       .flat()
-      .map((item) => item.key)
+      .flatMap((item) => item.keys)
 
     if (visibleItemKeys.length === 0) {
       return
@@ -871,7 +926,7 @@ function App() {
     saveItemsToHistory(
       Object.values(visibleGroceryByAisle)
         .flat()
-        .map((item) => item.item),
+        .flatMap((item) => Array.from({ length: item.count }, () => item.item)),
     )
     setRemovedShoppingItems((currentItems) => [
       ...currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
@@ -884,9 +939,11 @@ function App() {
       return
     }
 
-    const doneItemKeys = doneShoppingItems.map((item) => item.key)
+    const doneItemKeys = doneShoppingItems.flatMap((item) => item.keys)
     const doneItemKeySet = new Set(doneItemKeys)
-    saveItemsToHistory(doneShoppingItems.map((item) => item.item))
+    saveItemsToHistory(
+      doneShoppingItems.flatMap((item) => Array.from({ length: item.count }, () => item.item)),
+    )
     setCompletedShoppingItems((currentItems) =>
       currentItems.filter((itemKey) => !doneItemKeySet.has(itemKey)),
     )
@@ -1332,17 +1389,20 @@ function App() {
                 <ul className="check-list">
                   {checkShoppingItems.map((item) => (
                     <li key={item.key}>
-                      <span>{item.item}</span>
+                      <span>
+                        {item.item}
+                        {item.count > 1 ? <small className="item-count">x{item.count}</small> : null}
+                      </span>
                       <div className="check-list__actions">
                         <button
                           className="check-button check-button--got"
-                          onClick={() => markShoppingItemGot(item.key)}
+                          onClick={() => markShoppingItemsGot(item.keys)}
                         >
                           Got
                         </button>
                         <button
                           className="check-button check-button--need"
-                          onClick={() => markShoppingItemNeeded(item.key)}
+                          onClick={() => markShoppingItemsNeeded(item.keys)}
                         >
                           Need
                         </button>
@@ -1365,9 +1425,12 @@ function App() {
                         <li key={item.key}>
                           <button
                             className="shopping-list__item"
-                            onClick={() => markShoppingItemDone(item.key)}
+                            onClick={() => markShoppingItemsDone(item.keys)}
                           >
-                            <span>{item.item}</span>
+                            <span>
+                              {item.item}
+                              {item.count > 1 ? <small className="item-count">x{item.count}</small> : null}
+                            </span>
                           </button>
                         </li>
                       ))}
@@ -1393,12 +1456,15 @@ function App() {
                     <li key={item.key}>
                       <div className="done-list__item">
                         <div className="done-list__copy">
-                          <span>{item.item}</span>
+                          <span>
+                            {item.item}
+                            {item.count > 1 ? <small className="item-count">x{item.count}</small> : null}
+                          </span>
                           <small>{item.aisle}</small>
                         </div>
                         <button
                           className="link-button done-list__undo"
-                          onClick={() => undoCompletedShoppingItem(item.key)}
+                          onClick={() => undoCompletedShoppingItems(item.keys)}
                         >
                           Undo
                         </button>
