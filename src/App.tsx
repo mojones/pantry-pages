@@ -830,6 +830,27 @@ function App() {
     )
   }
 
+  function clearCheckShoppingItems() {
+    const checkItemKeys = checkShoppingItems.map((item) => item.key)
+
+    if (checkItemKeys.length === 0) {
+      return
+    }
+
+    const checkItemKeySet = new Set(checkItemKeys)
+
+    setNeededShoppingItems((currentItems) =>
+      currentItems.filter((itemKey) => !checkItemKeySet.has(itemKey)),
+    )
+    setCompletedShoppingItems((currentItems) =>
+      currentItems.filter((itemKey) => !checkItemKeySet.has(itemKey)),
+    )
+    setRemovedShoppingItems((currentItems) => [
+      ...currentItems.filter((itemKey) => !checkItemKeySet.has(itemKey)),
+      ...checkItemKeys,
+    ])
+  }
+
   function clearNeedShoppingItems() {
     const visibleItemKeys = Object.values(visibleGroceryByAisle)
       .flat()
@@ -1236,6 +1257,13 @@ function App() {
                 <p className="summary">
                   Remove everything from either list once you no longer need it on this trip.
                 </p>
+                <button
+                  className="action-button action-button--secondary"
+                  onClick={clearCheckShoppingItems}
+                  disabled={checkShoppingItems.length === 0}
+                >
+                  Clear Check List
+                </button>
                 <button
                   className="action-button"
                   onClick={clearNeedShoppingItems}
