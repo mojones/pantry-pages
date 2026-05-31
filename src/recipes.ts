@@ -58,51 +58,92 @@ const rawRecipeFiles = import.meta.glob('../source_recipes/**/*.txt', {
 const fieldPattern =
   /^(Title|Description|Source|Original URL|Yield|Prep|Cook|Total|Cookbook|Section|Tags|Image|Ingredients|Instructions):\s*(.*)$/
 
-const aisleRules: Array<{ aisle: string; pattern: RegExp }> = [
-  {
-    aisle: 'Produce',
-    pattern:
-      /\b(onion|shallot|garlic|ginger|potato|sweet potato|tomato|aubergine|eggplant|courgette|zucchini|broccoli|broccolini|cauliflower|cabbage|carrot|celery|leek|pea|peas|bean|beans|spinach|kale|chard|coriander|cilantro|parsley|basil|mint|dill|spring onion|scallion|lime|lemon|orange|apple|pear|melon|plum|chilli|chili|mushroom|hispi|kohlrabi|salad|lettuce|herb|rocket|cucumber)\b/i,
-  },
-  {
-    aisle: 'Spices',
-    pattern:
-      /\b(salt|pepper|cumin|turmeric|cinnamon|cayenne|paprika|garam masala|mustard seed|mustard seeds|fennel seeds|sesame seeds|spice|spices|chilli flakes|smoked salt|zaatar)\b/i,
-  },
-  {
-    aisle: 'Baking',
-    pattern:
-      /\b(flour|bicarbonate|baking powder|baking soda|sugar|brown sugar|caster sugar|oats|oatmeal|chocolate|cocoa|vanilla|pretzel|rice krispies)\b/i,
-  },
-  {
-    aisle: 'Pasta & Rice',
-    pattern:
-      /\b(pasta|spaghetti|orzo|rice|noodles|udon|soba|vermicelli|grain|polenta|couscous)\b/i,
-  },
-  {
-    aisle: 'Grains & Beans',
-    pattern:
-      /\b(lentil|lentils|chickpea|chickpeas|bean|beans|quinoa|dal|dhal|split pea|peas|falafel)\b/i,
-  },
-  {
-    aisle: 'Dairy & Chilled',
-    pattern:
-      /\b(butter|milk|cream|paneer|feta|cheddar|cheese|yogurt|yoghurt|tofu|egg|eggs)\b/i,
-  },
+const aisleCategories = [
+  'Produce',
+  'Herbs',
+  'Spices',
+  'Baking',
+  'Pasta & Rice',
+  'Grains & Beans',
+  'Dairy & Chilled',
+  'Canned & Jarred',
+  'Oils & Vinegars',
+  'Condiments & Sauces',
+  'Nuts & Seeds',
+  'Bakery',
+  'Drinks',
+  'Meat & Seafood',
+  'Pantry',
+] as const
+
+const aisleRules: Array<{ aisle: (typeof aisleCategories)[number]; pattern: RegExp }> = [
   {
     aisle: 'Canned & Jarred',
     pattern:
-      /\b(can|cans|tin|tins|coconut milk|tomato paste|diced tomatoes|crushed tomatoes|chopped tomatoes)\b/i,
+      /\b(can|cans|tin|tins|jar|jars|carton|coconut milk|tomato paste|tomato purée|tomato puree|passata|diced tomatoes|crushed tomatoes|chopped tomatoes|tinned tomatoes|cherry tomatoes|artichokes|chipotle in adobo)\b/i,
   },
   {
-    aisle: 'Condiments',
+    aisle: 'Oils & Vinegars',
     pattern:
-      /\b(miso|soy sauce|tamari|vinegar|tamarind|maple syrup|honey|sriracha|gochujang|chutney|harissa|olive oil|sesame oil|groundnut oil|coconut oil|oil)\b/i,
+      /\b(olive oil|extra virgin olive oil|extra-virgin olive oil|rapeseed oil|vegetable oil|sunflower oil|sesame oil|toasted sesame oil|groundnut oil|coconut oil|oil|vinegar|apple cider vinegar|red wine vinegar|white wine vinegar|rice wine vinegar|rice vinegar)\b/i,
+  },
+  {
+    aisle: 'Condiments & Sauces',
+    pattern:
+      /\b(miso|soy sauce|tamari|tamarind|maple syrup|honey|sriracha|gochujang|chutney|harissa|tahini|mustard|dijon|capers|molasses|brown rice syrup|vegan fish sauce|nutritional yeast|stock|broth)\b/i,
   },
   {
     aisle: 'Nuts & Seeds',
     pattern:
-      /\b(peanut|peanuts|peanut butter|hazelnut|hazelnuts|pistachio|pistachios|walnut|walnuts|almond|almonds|sesame)\b/i,
+      /\b(peanut|peanuts|peanut butter|hazelnut|hazelnuts|pistachio|pistachios|walnut|walnuts|almond|almonds|cashew|cashews|sesame|seed|seeds|pine nut|pine nuts)\b/i,
+  },
+  {
+    aisle: 'Grains & Beans',
+    pattern:
+      /\b(lentil|lentils|chickpea|chickpeas|butter bean|butter beans|black bean|black beans|cannellini|kidney bean|kidney beans|white bean|white beans|bean|beans|quinoa|dal|dhal|split pea|split peas|falafel)\b/i,
+  },
+  {
+    aisle: 'Pasta & Rice',
+    pattern:
+      /\b(pasta|spaghetti|macaroni|orzo|rice|noodles|udon|soba|vermicelli|polenta|couscous|bulgur|grain|grains)\b/i,
+  },
+  {
+    aisle: 'Dairy & Chilled',
+    pattern:
+      /\b(butter|milk|cream|paneer|feta|halloumi|cheddar|cheese|yogurt|yoghurt|tofu|egg|eggs|ghee|vegan butter|margarine)\b/i,
+  },
+  {
+    aisle: 'Spices',
+    pattern:
+      /\b(salt|pepper|cumin|turmeric|cinnamon|cardamom|nutmeg|cayenne|paprika|garam masala|mustard seed|mustard seeds|fennel seeds|coriander seed|coriander seeds|ground coriander|chilli flakes|chili flakes|oregano|thyme|bay leaves|bay leaf|zaatar|spice|spices|smoked salt)\b/i,
+  },
+  {
+    aisle: 'Baking',
+    pattern:
+      /\b(flour|gram flour|besan|cornstarch|cornflour|bicarbonate|baking powder|baking soda|yeast|sugar|brown sugar|caster sugar|demerara sugar|icing sugar|oats|oatmeal|chocolate|cocoa|vanilla|pretzel|rice krispies)\b/i,
+  },
+  {
+    aisle: 'Bakery',
+    pattern:
+      /\b(breadcrumb|breadcrumbs|bread|pitta|tortilla|pastry|puff pastry|crumpet|crumpets)\b/i,
+  },
+  {
+    aisle: 'Drinks',
+    pattern: /\b(apple juice|juice|wine|beer|cider)\b/i,
+  },
+  {
+    aisle: 'Meat & Seafood',
+    pattern: /\b(anchovy|anchovies|fish|prawn|prawns|chicken|beef|lamb|pork)\b/i,
+  },
+  {
+    aisle: 'Herbs',
+    pattern:
+      /\b(coriander|cilantro|parsley|basil|mint|dill|chives|thyme|rosemary|sage|tarragon|herb|herbs)\b/i,
+  },
+  {
+    aisle: 'Produce',
+    pattern:
+      /\b(onion|shallot|garlic|ginger|potato|sweet potato|tomato|aubergine|eggplant|courgette|zucchini|broccoli|broccolini|cauliflower|cabbage|carrot|celery|leek|pea|peas|spinach|kale|chard|spring onion|scallion|lime|lemon|orange|apple|pear|melon|plum|chilli|chili|pepper|peppers|mushroom|hispi|kohlrabi|salad|lettuce|rocket|cucumber|avocado|corn|sweetcorn|squash|pumpkin|beetroot|beet|radish|sprout|sprouts|cress)\b/i,
   },
 ]
 
@@ -350,4 +391,4 @@ function buildImportedRecipe(draft: ImportedRecipeDraft, existingIds: Set<string
 }
 
 export type { ImportedRecipeDraft, Ingredient, Recipe }
-export { buildImportedRecipe, recipes, splitIngredient }
+export { aisleCategories, buildImportedRecipe, recipes, splitIngredient }

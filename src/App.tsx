@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
+  aisleCategories,
   buildImportedRecipe,
   recipes,
   splitIngredient,
@@ -14,7 +15,7 @@ type PlannedRecipe = {
   excludedIngredientKeys: string[]
 }
 
-type View = 'cookbook' | 'recipe' | 'planner' | 'shopping' | 'import'
+type View = 'cookbook' | 'recipe' | 'planner' | 'shopping' | 'categories' | 'import'
 
 type PersistedAppState = {
   importedRecipes: Recipe[]
@@ -26,6 +27,7 @@ type PersistedAppState = {
   removedShoppingItems: string[]
   shoppingHistoryItems: string[]
   curatedFrequentItems: string[]
+  categoryOverrides: Record<string, string>
 }
 
 type GroceryListItem = {
@@ -40,6 +42,14 @@ type RawGroceryListItem = {
   item: string
 }
 
+type CategoryIngredient = {
+  key: string
+  item: string
+  aisle: string
+  defaultAisle: string
+  count: number
+}
+
 const initialPlannedRecipes: PlannedRecipe[] = []
 const baseRecipeIds = new Set(recipes.map((recipe) => recipe.id))
 const baseRecipeNotes = Object.fromEntries(
@@ -51,6 +61,7 @@ const views: { id: View; label: string; caption: string; icon: string }[] = [
   { id: 'recipe', label: 'Recipe', caption: 'Read and edit the selected recipe', icon: '🍳' },
   { id: 'planner', label: 'Planner', caption: 'Collect recipes you want to make', icon: '📅' },
   { id: 'shopping', label: 'Shopping List', caption: 'Generate groceries from the plan', icon: '🛒' },
+  { id: 'categories', label: 'Categories', caption: 'Fix ingredient aisles', icon: '⇄' },
   { id: 'import', label: 'Import', caption: 'Create a recipe from a URL', icon: '＋' },
 ]
 
@@ -91,6 +102,10 @@ function normalizeShoppingItemLabel(item: string) {
 }
 
 function formatShoppingItemLabel(item: string) {
+  return normalizeShoppingItemLabel(item)
+}
+
+function getIngredientCategoryKey(item: string) {
   return normalizeShoppingItemLabel(item)
 }
 
@@ -282,6 +297,8 @@ function App() {
   const [shoppingHistoryItems, setShoppingHistoryItems] = useState<string[]>([])
   const [curatedFrequentItems, setCuratedFrequentItems] = useState<string[]>([])
   const [curatedFrequentInput, setCuratedFrequentInput] = useState('')
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({})
+  const [draggedCategoryIngredientKey, setDraggedCategoryIngredientKey] = useState('')
   const [visibleRecipeCount, setVisibleRecipeCount] = useState(recipeBatchSize)
   const [stateLoaded, setStateLoaded] = useState(false)
   const [stateError, setStateError] = useState('')
@@ -324,6 +341,7 @@ function App() {
         const savedCuratedFrequentItems = payload.curatedFrequentItems ?? []
         setCuratedFrequentItems(savedCuratedFrequentItems)
         setCuratedFrequentInput(savedCuratedFrequentItems.join('\n'))
+        setCategoryOverrides(payload.categoryOverrides ?? {})
         setSelectedRecipeId((currentRecipeId) =>
           availableRecipeIds.has(currentRecipeId) ? currentRecipeId : mergedRecipes[0].id,
         )
@@ -376,6 +394,7 @@ function App() {
               removedShoppingItems,
               shoppingHistoryItems,
               curatedFrequentItems,
+              categoryOverrides,
             } satisfies PersistedAppState),
           })
 
@@ -411,6 +430,7 @@ function App() {
     removedShoppingItems,
     shoppingHistoryItems,
     curatedFrequentItems,
+    categoryOverrides,
     stateLoaded,
   ])
 
@@ -456,6 +476,48 @@ function App() {
         Boolean(plannedRecipe),
     )
 
+  function resolveIngredientAisle(ingredient: Ingredient) {
+    return categoryOverrides[getIngredientCategoryKey(ingredient.item)] || ingredient.aisle
+  }
+
+  const categoryIngredients = Array.from(
+    recipeLibrary
+      .flatMap((recipe) => recipe.ingredients)
+      .reduce<Map<string, CategoryIngredient>>((ingredientsByKey, ingredient) => {
+        const key = getIngredientCategoryKey(ingredient.item)
+
+        if (!key) {
+          return ingredientsByKey
+        }
+
+        const currentIngredient = ingredientsByKey.get(key)
+        const aisle = resolveIngredientAisle(ingredient)
+
+        if (currentIngredient) {
+          currentIngredient.count += 1
+          return ingredientsByKey
+        }
+
+        ingredientsByKey.set(key, {
+          key,
+          item: formatShoppingItemLabel(ingredient.item),
+          aisle,
+          defaultAisle: ingredient.aisle,
+          count: 1,
+        })
+
+        return ingredientsByKey
+      }, new Map())
+      .values(),
+  ).sort((left, right) => left.item.localeCompare(right.item))
+
+  const categoryIngredientsByAisle = Object.fromEntries(
+    aisleCategories.map((aisle) => [
+      aisle,
+      categoryIngredients.filter((ingredient) => ingredient.aisle === aisle),
+    ]),
+  ) as Record<string, CategoryIngredient[]>
+
   const groceryByAisle = plannedRecipes.reduce<Record<string, RawGroceryListItem[]>>((groups, plannedRecipe) => {
     plannedRecipe.recipe.ingredients
       .filter(
@@ -463,11 +525,13 @@ function App() {
           !plannedRecipe.excludedIngredientKeys.includes(ingredientKey(ingredient)),
       )
       .forEach((ingredient, ingredientIndex) => {
-        if (!groups[ingredient.aisle]) {
-          groups[ingredient.aisle] = []
+        const aisle = resolveIngredientAisle(ingredient)
+
+        if (!groups[aisle]) {
+          groups[aisle] = []
         }
 
-        groups[ingredient.aisle].push({
+        groups[aisle].push({
           key: `recipe:${plannedRecipe.recipe.id}:${ingredientIndex}:${ingredientKey(ingredient)}`,
           item: formatIngredient(ingredient),
         })
@@ -479,11 +543,13 @@ function App() {
   manualShoppingItems
     .map((item, itemIndex) => ({ ingredient: splitIngredient(item), itemIndex }))
     .forEach(({ ingredient, itemIndex }) => {
-      if (!groceryByAisle[ingredient.aisle]) {
-        groceryByAisle[ingredient.aisle] = []
+      const aisle = resolveIngredientAisle(ingredient)
+
+      if (!groceryByAisle[aisle]) {
+        groceryByAisle[aisle] = []
       }
 
-      groceryByAisle[ingredient.aisle].push({
+      groceryByAisle[aisle].push({
         key: manualShoppingItemKey(manualShoppingItems[itemIndex], itemIndex),
         item: formatIngredient(ingredient),
       })
@@ -954,6 +1020,25 @@ function App() {
       ...currentItems.filter((itemKey) => !doneItemKeySet.has(itemKey)),
       ...doneItemKeys,
     ])
+  }
+
+  function moveIngredientToAisle(ingredientCategoryKey: string, aisle: string) {
+    if (!ingredientCategoryKey || !aisleCategories.includes(aisle as (typeof aisleCategories)[number])) {
+      return
+    }
+
+    setCategoryOverrides((currentOverrides) => ({
+      ...currentOverrides,
+      [ingredientCategoryKey]: aisle,
+    }))
+  }
+
+  function resetIngredientAisle(ingredientCategoryKey: string) {
+    setCategoryOverrides((currentOverrides) => {
+      const nextOverrides = { ...currentOverrides }
+      delete nextOverrides[ingredientCategoryKey]
+      return nextOverrides
+    })
   }
 
   return (
@@ -1474,6 +1559,103 @@ function App() {
                 </ul>
               </article>
             ) : null}
+          </section>
+        ) : null}
+
+        {activeView === 'categories' ? (
+          <section className="panel panel--wide">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Category Admin</p>
+                <h3>Ingredient Aisles</h3>
+              </div>
+              <span className="badge">{categoryIngredients.length} ingredients</span>
+            </div>
+
+            <p className="summary">
+              Drag ingredients between aisles, or use the category menu on any item.
+            </p>
+
+            <div className="category-board">
+              {aisleCategories.map((aisle) => {
+                const ingredients = categoryIngredientsByAisle[aisle] ?? []
+
+                return (
+                  <article
+                    key={aisle}
+                    className="category-column"
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      const ingredientCategoryKey =
+                        event.dataTransfer.getData('text/plain') || draggedCategoryIngredientKey
+                      moveIngredientToAisle(ingredientCategoryKey, aisle)
+                      setDraggedCategoryIngredientKey('')
+                    }}
+                  >
+                    <div className="category-column__header">
+                      <h4>{aisle}</h4>
+                      <span className="badge">{ingredients.length}</span>
+                    </div>
+
+                    {ingredients.length > 0 ? (
+                      <ul className="category-list">
+                        {ingredients.map((ingredient) => {
+                          const isOverridden =
+                            categoryOverrides[ingredient.key] &&
+                            categoryOverrides[ingredient.key] !== ingredient.defaultAisle
+
+                          return (
+                            <li
+                              key={ingredient.key}
+                              className="category-item"
+                              draggable
+                              onDragStart={(event) => {
+                                setDraggedCategoryIngredientKey(ingredient.key)
+                                event.dataTransfer.setData('text/plain', ingredient.key)
+                              }}
+                              onDragEnd={() => setDraggedCategoryIngredientKey('')}
+                            >
+                              <div className="category-item__copy">
+                                <strong>{ingredient.item}</strong>
+                                <small>
+                                  {ingredient.count} recipe{ingredient.count === 1 ? '' : 's'}
+                                  {isOverridden ? ` · was ${ingredient.defaultAisle}` : ''}
+                                </small>
+                              </div>
+                              <div className="category-item__controls">
+                                <select
+                                  value={ingredient.aisle}
+                                  onChange={(event) =>
+                                    moveIngredientToAisle(ingredient.key, event.target.value)
+                                  }
+                                  aria-label={`Aisle for ${ingredient.item}`}
+                                >
+                                  {aisleCategories.map((category) => (
+                                    <option key={category} value={category}>
+                                      {category}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  className="link-button"
+                                  onClick={() => resetIngredientAisle(ingredient.key)}
+                                  disabled={!categoryOverrides[ingredient.key]}
+                                >
+                                  Reset
+                                </button>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="summary">Drop ingredients here.</p>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
           </section>
         ) : null}
 

@@ -40,6 +40,7 @@ type PersistedAppState = {
   removedShoppingItems: string[]
   shoppingHistoryItems: string[]
   curatedFrequentItems: string[]
+  categoryOverrides: Record<string, string>
 }
 
 type MiddlewareStack = {
@@ -63,6 +64,7 @@ const defaultPersistedState: PersistedAppState = {
   removedShoppingItems: [],
   shoppingHistoryItems: [],
   curatedFrequentItems: [],
+  categoryOverrides: {},
 }
 
 const dataDirectory = process.env.DATA_DIR?.trim() || path.join(process.cwd(), 'data')
@@ -176,6 +178,19 @@ function normalizeRecipeNotes(value: unknown) {
   )
 }
 
+function normalizeStringRecord(value: unknown) {
+  if (!isRecord(value)) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      .map(([key, recordValue]) => [key.trim(), recordValue.trim()])
+      .filter(([key, recordValue]) => key && recordValue),
+  )
+}
+
 function normalizePersistedState(value: unknown): PersistedAppState {
   if (!isRecord(value)) {
     return defaultPersistedState
@@ -199,6 +214,7 @@ function normalizePersistedState(value: unknown): PersistedAppState {
     removedShoppingItems: normalizeStringArray(value.removedShoppingItems).map((item) => item.trim()).filter(Boolean),
     shoppingHistoryItems: normalizeStringArray(value.shoppingHistoryItems).map((item) => item.trim()).filter(Boolean),
     curatedFrequentItems: normalizeStringArray(value.curatedFrequentItems).map((item) => item.trim()).filter(Boolean),
+    categoryOverrides: normalizeStringRecord(value.categoryOverrides),
   }
 }
 
