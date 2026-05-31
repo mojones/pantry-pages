@@ -503,7 +503,7 @@ function App() {
 
   const frequentShoppingItems = [...curatedFrequentList, ...historyFrequentList].sort(
     (left, right) => right.count - left.count || left.label.localeCompare(right.label),
-  ).slice(0, 12)
+  )
 
   useEffect(() => {
     setVisibleRecipeCount(recipeBatchSize)
