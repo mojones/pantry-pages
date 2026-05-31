@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
   buildImportedRecipe,
@@ -48,6 +48,7 @@ const views: { id: View; label: string; caption: string; icon: string }[] = [
 
 const recipePlaceholderImage = '/recipe-placeholder.svg'
 const scaleOptions = [0.5, 1, 2, 3]
+const recipeBatchSize = 36
 type ParsedAmountToken = {
   value: number
   plus: boolean
@@ -230,8 +231,10 @@ function App() {
   const [shoppingHistoryItems, setShoppingHistoryItems] = useState<string[]>([])
   const [curatedFrequentItems, setCuratedFrequentItems] = useState<string[]>([])
   const [curatedFrequentInput, setCuratedFrequentInput] = useState('')
+  const [visibleRecipeCount, setVisibleRecipeCount] = useState(recipeBatchSize)
   const [stateLoaded, setStateLoaded] = useState(false)
   const [stateError, setStateError] = useState('')
+  const recipeListSentinelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -375,6 +378,8 @@ function App() {
 
     return matchesSection && haystack.includes(search.trim().toLowerCase())
   })
+  const displayedRecipes = visibleRecipes.slice(0, visibleRecipeCount)
+  const hasMoreRecipes = displayedRecipes.length < visibleRecipes.length
 
   const selectedRecipe =
     recipeLibrary.find((recipe) => recipe.id === selectedRecipeId) ?? recipeLibrary[0]
@@ -495,6 +500,37 @@ function App() {
   const frequentShoppingItems = [...curatedFrequentList, ...historyFrequentList].sort(
     (left, right) => right.count - left.count || left.label.localeCompare(right.label),
   ).slice(0, 12)
+
+  useEffect(() => {
+    setVisibleRecipeCount(recipeBatchSize)
+  }, [recipeLibrary.length, search, selectedSection])
+
+  useEffect(() => {
+    if (activeView !== 'cookbook' || !hasMoreRecipes) {
+      return
+    }
+
+    const sentinel = recipeListSentinelRef.current
+
+    if (!sentinel) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisibleRecipeCount((currentCount) =>
+            Math.min(currentCount + recipeBatchSize, visibleRecipes.length),
+          )
+        }
+      },
+      { rootMargin: '900px 0px' },
+    )
+
+    observer.observe(sentinel)
+
+    return () => observer.disconnect()
+  }, [activeView, hasMoreRecipes, visibleRecipes.length])
 
   useEffect(() => {
     const validItemKeys = new Set(
@@ -801,7 +837,7 @@ function App() {
             </label>
 
             <div className="recipe-grid">
-              {visibleRecipes.map((recipe) => (
+              {displayedRecipes.map((recipe) => (
                 <article
                   key={recipe.id}
                   className={
@@ -857,6 +893,20 @@ function App() {
                 </article>
               ))}
             </div>
+            {hasMoreRecipes ? (
+              <div className="recipe-list-sentinel" ref={recipeListSentinelRef}>
+                <button
+                  className="action-button action-button--secondary"
+                  onClick={() =>
+                    setVisibleRecipeCount((currentCount) =>
+                      Math.min(currentCount + recipeBatchSize, visibleRecipes.length),
+                    )
+                  }
+                >
+                  Show more recipes
+                </button>
+              </div>
+            ) : null}
           </section>
         ) : null}
 

@@ -271,6 +271,12 @@ textarea {
   -webkit-line-clamp: 3;
 }
 
+.recipe-list-sentinel {
+  display: grid;
+  justify-content: center;
+  margin-top: 22px;
+}
+
 .planned-recipe-card {
   position: relative;
 }
