@@ -964,6 +964,16 @@ function App() {
     )
   }
 
+  function markAllCheckShoppingItemsNeeded() {
+    const checkItemKeys = checkShoppingItems.flatMap((item) => item.keys)
+
+    if (checkItemKeys.length === 0) {
+      return
+    }
+
+    markShoppingItemsNeeded(checkItemKeys)
+  }
+
   function markShoppingItemsGot(itemKeys: string[]) {
     const itemKeySet = new Set(itemKeys)
 
@@ -1320,7 +1330,19 @@ function App() {
                   )
 
                   return (
-                    <article key={plannedRecipe.recipe.id} className="planned-recipe-card">
+                    <article
+                      key={plannedRecipe.recipe.id}
+                      className="planned-recipe-card"
+                      onClick={() => selectRecipe(plannedRecipe.recipe.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          selectRecipe(plannedRecipe.recipe.id)
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
                       <img
                         className="planned-recipe-card__image"
                         src={resolveRecipeImage(plannedRecipe.recipe.image)}
@@ -1354,10 +1376,17 @@ function App() {
                           Open recipe
                         </button>
                         <button
-                          className="link-button"
-                          onClick={() => removePlannedRecipe(plannedRecipe.recipe.id)}
+                          className="link-button planned-recipe-card__remove-button"
+                          aria-label={`Remove ${plannedRecipe.recipe.title} from meal plan`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            removePlannedRecipe(plannedRecipe.recipe.id)
+                          }}
                         >
-                          Remove
+                          <span className="planned-recipe-card__remove-label">Remove</span>
+                          <span className="planned-recipe-card__remove-icon" aria-hidden="true">
+                            ×
+                          </span>
                         </button>
                       </div>
                     </article>
@@ -1395,44 +1424,10 @@ function App() {
                 </label>
 
                 <div className="planner-actions">
-                  <div className="planner-hint">
-                    <span>Manual items</span>
-                    <p>
-                      These go into the check list first, then move into the categorized
-                      grocery list when you mark them as needed.
-                    </p>
-                  </div>
                   <button className="action-button" onClick={addManualShoppingItems}>
                     Add Items
                   </button>
                 </div>
-              </div>
-              <div className="import-card shopping-bulk-actions">
-                <h4>List Actions</h4>
-                <p className="summary">
-                  Remove everything from either list once you no longer need it on this trip.
-                </p>
-                <button
-                  className="action-button action-button--secondary"
-                  onClick={clearCheckShoppingItems}
-                  disabled={checkShoppingItems.length === 0}
-                >
-                  Clear Check List
-                </button>
-                <button
-                  className="action-button"
-                  onClick={clearNeedShoppingItems}
-                  disabled={Object.keys(visibleGroceryByAisle).length === 0}
-                >
-                  Clear Need List
-                </button>
-                <button
-                  className="link-button"
-                  onClick={clearBoughtShoppingItems}
-                  disabled={doneShoppingItems.length === 0}
-                >
-                  Clear Bought List
-                </button>
               </div>
               <div className="import-card shopping-bulk-actions">
                 <h4>Frequently Bought</h4>
@@ -1481,7 +1476,23 @@ function App() {
             <article className="grocery-group check-group">
               <div className="grocery-group__header">
                 <h4>Check Items</h4>
-                <span className="badge">{checkShoppingItems.length} items</span>
+                <div className="list-header-actions">
+                  <span className="badge">{checkShoppingItems.length} items</span>
+                  <button
+                    className="link-button"
+                    onClick={markAllCheckShoppingItemsNeeded}
+                    disabled={checkShoppingItems.length === 0}
+                  >
+                    Need All
+                  </button>
+                  <button
+                    className="link-button"
+                    onClick={clearCheckShoppingItems}
+                    disabled={checkShoppingItems.length === 0}
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
               {checkShoppingItems.length > 0 ? (
                 <ul className="check-list">
@@ -1513,6 +1524,21 @@ function App() {
               )}
             </article>
 
+            <div className="grocery-group__header shopping-list-header">
+              <h4>Need To Buy</h4>
+              <div className="list-header-actions">
+                <span className="badge">
+                  {Object.values(visibleGroceryByAisle).flat().length} items
+                </span>
+                <button
+                  className="link-button"
+                  onClick={clearNeedShoppingItems}
+                  disabled={Object.keys(visibleGroceryByAisle).length === 0}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
             <div className="grocery-grid">
               {Object.entries(visibleGroceryByAisle).length > 0 ? (
                 Object.entries(visibleGroceryByAisle).map(([aisle, items]) => (
@@ -1547,7 +1573,16 @@ function App() {
               <article className="grocery-group grocery-group--done">
                 <div className="grocery-group__header">
                   <h4>Bought</h4>
-                  <span className="badge">{doneShoppingItems.length} items</span>
+                  <div className="list-header-actions">
+                    <span className="badge">{doneShoppingItems.length} items</span>
+                    <button
+                      className="link-button"
+                      onClick={clearBoughtShoppingItems}
+                      disabled={doneShoppingItems.length === 0}
+                    >
+                      Clear
+                    </button>
+                  </div>
                 </div>
                 <ul className="done-list">
                   {doneShoppingItems.map((item) => (
