@@ -21,6 +21,50 @@ function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, ' ').trim()
 }
 
+function escapeControlCharactersInJsonStrings(value: string) {
+  let output = ''
+  let inString = false
+  let escaping = false
+
+  for (const character of value) {
+    if (!inString) {
+      output += character
+      inString = character === '"'
+      continue
+    }
+
+    if (escaping) {
+      output += character
+      escaping = false
+      continue
+    }
+
+    if (character === '\\') {
+      output += character
+      escaping = true
+      continue
+    }
+
+    if (character === '"') {
+      output += character
+      inString = false
+      continue
+    }
+
+    output += character.charCodeAt(0) <= 0x1f ? ' ' : character
+  }
+
+  return output
+}
+
+function parseJsonLd(scriptContent: string): JsonValue {
+  try {
+    return JSON.parse(scriptContent) as JsonValue
+  } catch {
+    return JSON.parse(escapeControlCharactersInJsonStrings(scriptContent)) as JsonValue
+  }
+}
+
 function decodeHtmlEntities(value: string) {
   const $ = load(`<div>${value}</div>`)
   return $('div').text()
@@ -218,7 +262,7 @@ function extractRecipeSchema(html: string) {
     }
 
     try {
-      const parsed = JSON.parse(scriptContent) as JsonValue
+      const parsed = parseJsonLd(scriptContent)
       const recipeNode = flattenJsonLd(parsed).find((entry) => isRecipeNode(entry))
 
       if (recipeNode) {

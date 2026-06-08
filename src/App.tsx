@@ -17,6 +17,11 @@ type PlannedRecipe = {
 
 type View = 'cookbook' | 'recipe' | 'planner' | 'shopping' | 'categories' | 'import'
 
+type AppHistoryState = {
+  pantryPagesView?: View
+  selectedRecipeId?: string
+}
+
 type PersistedAppState = {
   importedRecipes: Recipe[]
   plannedRecipes: PlannedRecipe[]
@@ -68,6 +73,7 @@ const views: { id: View; label: string; caption: string; icon: string }[] = [
 const recipePlaceholderImage = '/recipe-placeholder.svg'
 const scaleOptions = [0.5, 1, 2, 3]
 const recipeBatchSize = 36
+const viewIds = new Set<View>(views.map((view) => view.id))
 type ParsedAmountToken = {
   value: number
   plus: boolean
@@ -330,6 +336,8 @@ function App() {
   const [stateLoaded, setStateLoaded] = useState(false)
   const [stateError, setStateError] = useState('')
   const recipeListSentinelRef = useRef<HTMLDivElement | null>(null)
+  const historyInitializedRef = useRef(false)
+  const handlingPopStateRef = useRef(false)
 
   useEffect(() => {
     let ignore = false
@@ -389,6 +397,47 @@ function App() {
       ignore = true
     }
   }, [])
+
+  useEffect(() => {
+    function handlePopState(event: PopStateEvent) {
+      const state = event.state as AppHistoryState | null
+
+      if (!state?.pantryPagesView || !viewIds.has(state.pantryPagesView)) {
+        return
+      }
+
+      handlingPopStateRef.current = true
+      setActiveView(state.pantryPagesView)
+
+      if (state.selectedRecipeId) {
+        setSelectedRecipeId(state.selectedRecipeId)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  useEffect(() => {
+    const state: AppHistoryState = {
+      pantryPagesView: activeView,
+      selectedRecipeId,
+    }
+
+    if (!historyInitializedRef.current) {
+      window.history.replaceState(state, '', window.location.href)
+      historyInitializedRef.current = true
+      return
+    }
+
+    if (handlingPopStateRef.current) {
+      handlingPopStateRef.current = false
+      return
+    }
+
+    window.history.pushState(state, '', window.location.href)
+  }, [activeView, selectedRecipeId])
 
   useEffect(() => {
     if (!stateLoaded) {
