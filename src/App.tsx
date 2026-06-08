@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import {
   aisleCategories,
@@ -271,10 +271,37 @@ function mergeRecipeLibrary(importedRecipes: Recipe[]) {
   ]
 }
 
+function collectCommonSearchTags(recipeLibrary: Recipe[]) {
+  const tagCounts = new Map<string, number>()
+  const tagLabels = new Map<string, string>()
+
+  recipeLibrary.forEach((recipe) => {
+    ;[recipe.section, ...recipe.tags].forEach((tag) => {
+      const label = tag.trim()
+
+      if (!label) {
+        return
+      }
+
+      const key = label.toLowerCase()
+      tagCounts.set(key, (tagCounts.get(key) ?? 0) + 1)
+      tagLabels.set(key, tagLabels.get(key) ?? label)
+    })
+  })
+
+  return [...tagCounts.entries()]
+    .sort(
+      ([leftKey, leftCount], [rightKey, rightCount]) =>
+        rightCount - leftCount ||
+        (tagLabels.get(leftKey) ?? leftKey).localeCompare(tagLabels.get(rightKey) ?? rightKey),
+    )
+    .slice(0, 80)
+    .map(([key]) => tagLabels.get(key) ?? key)
+}
+
 function App() {
   const [recipeLibrary, setRecipeLibrary] = useState(recipes)
   const [activeView, setActiveView] = useState<View>('cookbook')
-  const [selectedSection, setSelectedSection] = useState('All')
   const [selectedRecipeId, setSelectedRecipeId] = useState(recipes[0].id)
   const [search, setSearch] = useState('')
   const [plannedRecipesState, setPlannedRecipesState] = useState(initialPlannedRecipes)
@@ -434,11 +461,12 @@ function App() {
     stateLoaded,
   ])
 
-  const allSections = ['All', ...new Set(recipeLibrary.map((recipe) => recipe.section))]
+  const commonSearchTags = useMemo(
+    () => collectCommonSearchTags(recipeLibrary),
+    [recipeLibrary],
+  )
 
   const visibleRecipes = recipeLibrary.filter((recipe) => {
-    const matchesSection =
-      selectedSection === 'All' || recipe.section === selectedSection
     const haystack = [
       recipe.title,
       recipe.author,
@@ -450,7 +478,7 @@ function App() {
       .join(' ')
       .toLowerCase()
 
-    return matchesSection && haystack.includes(search.trim().toLowerCase())
+    return haystack.includes(search.trim().toLowerCase())
   })
   const displayedRecipes = visibleRecipes.slice(0, visibleRecipeCount)
   const hasMoreRecipes = displayedRecipes.length < visibleRecipes.length
@@ -638,7 +666,7 @@ function App() {
 
   useEffect(() => {
     setVisibleRecipeCount(recipeBatchSize)
-  }, [recipeLibrary.length, search, selectedSection])
+  }, [recipeLibrary.length, search])
 
   useEffect(() => {
     if (activeView !== 'cookbook' || !hasMoreRecipes) {
@@ -737,7 +765,6 @@ function App() {
         [importedRecipe.id]: '',
       }))
       setSelectedRecipeId(importedRecipe.id)
-      setSelectedSection('All')
       setSearch('')
       setLastImportedRecipeTitle(importedRecipe.title)
       setRecipeScale(1)
@@ -1077,26 +1104,20 @@ function App() {
               <span className="badge">{visibleRecipes.length} matches</span>
             </div>
 
-            <div className="section-pills">
-              {allSections.map((section) => (
-                <button
-                  key={section}
-                  className={section === selectedSection ? 'pill pill--active' : 'pill'}
-                  onClick={() => setSelectedSection(section)}
-                >
-                  {section}
-                </button>
-              ))}
-            </div>
-
             <label className="searchbox">
               <span>Search by title, ingredient, author, or tag</span>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
+                list="common-search-tags"
                 placeholder="Try 'miso', 'lentils', or 'Meera'"
               />
             </label>
+            <datalist id="common-search-tags">
+              {commonSearchTags.map((tag) => (
+                <option key={tag} value={tag} />
+              ))}
+            </datalist>
 
             <div className="recipe-grid">
               {displayedRecipes.map((recipe) => (

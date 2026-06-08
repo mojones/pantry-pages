@@ -170,16 +170,11 @@ h4 {
   color: var(--muted);
 }
 
-.section-pills,
 .tag-row,
 .scale-controls__buttons {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.section-pills {
-  margin: 20px 0 18px;
 }
 
 .pill,
