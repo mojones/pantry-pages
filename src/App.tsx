@@ -1155,22 +1155,14 @@ function App() {
                   </div>
                   <div className="card-actions">
                     <button
-                      className="link-button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        selectRecipe(recipe.id)
-                      }}
-                    >
-                      Open recipe
-                    </button>
-                    <button
-                      className="link-button"
+                      className="link-button recipe-card__plan-button"
+                      aria-label={`Add ${recipe.title} to meal plan`}
                       onClick={(event) => {
                         event.stopPropagation()
                         openIngredientPicker(recipe.id)
                       }}
                     >
-                      Add to meal plan
+                      <span aria-hidden="true">+</span>
                     </button>
                   </div>
                 </article>
