@@ -37,8 +37,6 @@ type PersistedAppState = {
   neededShoppingItems: string[]
   completedShoppingItems: string[]
   removedShoppingItems: string[]
-  shoppingHistoryItems: string[]
-  curatedFrequentItems: string[]
   categoryOverrides: Record<string, string>
 }
 
@@ -341,9 +339,6 @@ function App() {
   const [completedShoppingItems, setCompletedShoppingItems] = useState<string[]>([])
   const [removedShoppingItems, setRemovedShoppingItems] = useState<string[]>([])
   const [manualShoppingInput, setManualShoppingInput] = useState('')
-  const [shoppingHistoryItems, setShoppingHistoryItems] = useState<string[]>([])
-  const [curatedFrequentItems, setCuratedFrequentItems] = useState<string[]>([])
-  const [curatedFrequentInput, setCuratedFrequentInput] = useState('')
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({})
   const [draggedCategoryIngredientKey, setDraggedCategoryIngredientKey] = useState('')
   const [visibleRecipeCount, setVisibleRecipeCount] = useState(recipeBatchSize)
@@ -386,10 +381,6 @@ function App() {
         setNeededShoppingItems(payload.neededShoppingItems ?? [])
         setCompletedShoppingItems(payload.completedShoppingItems)
         setRemovedShoppingItems(payload.removedShoppingItems)
-        setShoppingHistoryItems(payload.shoppingHistoryItems ?? [])
-        const savedCuratedFrequentItems = payload.curatedFrequentItems ?? []
-        setCuratedFrequentItems(savedCuratedFrequentItems)
-        setCuratedFrequentInput(savedCuratedFrequentItems.join('\n'))
         setCategoryOverrides(payload.categoryOverrides ?? {})
         setSelectedRecipeId((currentRecipeId) =>
           availableRecipeIds.has(currentRecipeId) ? currentRecipeId : mergedRecipes[0].id,
@@ -485,8 +476,6 @@ function App() {
               neededShoppingItems,
               completedShoppingItems,
               removedShoppingItems,
-              shoppingHistoryItems,
-              curatedFrequentItems,
               categoryOverrides,
             } satisfies PersistedAppState),
           })
@@ -521,8 +510,6 @@ function App() {
     recipeLibrary,
     recipeNotes,
     removedShoppingItems,
-    shoppingHistoryItems,
-    curatedFrequentItems,
     categoryOverrides,
     stateLoaded,
   ])
@@ -696,43 +683,6 @@ function App() {
     ).map((item) => ({ ...item, aisle })),
   )
 
-  const frequentCounts = shoppingHistoryItems.reduce<Record<string, { count: number; label: string }>>((counts, item) => {
-      const normalized = item.trim().toLowerCase()
-      if (!normalized) {
-        return counts
-      }
-
-      if (!counts[normalized]) {
-        counts[normalized] = { count: 0, label: item.trim() }
-      }
-
-      counts[normalized].count += 1
-      return counts
-    }, {})
-
-  const curatedFrequentSet = new Set(
-    curatedFrequentItems.map((item) => item.trim().toLowerCase()).filter(Boolean),
-  )
-
-  const curatedFrequentList = Array.from(curatedFrequentSet).map((normalized) => ({
-    normalized,
-    label: frequentCounts[normalized]?.label ?? normalized,
-    count: frequentCounts[normalized]?.count ?? 0,
-    isCurated: true,
-  }))
-
-  const historyFrequentList = Object.entries(frequentCounts)
-    .filter(([normalized, entry]) => entry.count >= 2 && !curatedFrequentSet.has(normalized))
-    .map(([normalized, entry]) => ({
-      normalized,
-      label: entry.label,
-      count: entry.count,
-      isCurated: false,
-    }))
-
-  const frequentShoppingItems = [...curatedFrequentList, ...historyFrequentList].sort(
-    (left, right) => right.count - left.count || left.label.localeCompare(right.label),
-  )
 
   useEffect(() => {
     setVisibleRecipeCount(recipeBatchSize)
@@ -961,98 +911,6 @@ function App() {
     setManualShoppingInput('')
   }
 
-  function addFrequentShoppingItem(itemLabel: string) {
-    const normalized = itemLabel.trim().toLowerCase()
-    if (!normalized) {
-      return
-    }
-
-    const matchingManualItemKeys = manualShoppingItems
-      .map((item, itemIndex) => ({
-        normalized: item.trim().toLowerCase(),
-        key: manualShoppingItemKey(item, itemIndex),
-      }))
-      .filter((item) => item.normalized === normalized)
-      .map((item) => item.key)
-
-    if (matchingManualItemKeys.length > 0) {
-      const matchingManualItemKeySet = new Set(matchingManualItemKeys)
-
-      setCompletedShoppingItems((currentItems) =>
-        currentItems.filter((itemKey) => !matchingManualItemKeySet.has(itemKey)),
-      )
-      setRemovedShoppingItems((currentItems) =>
-        currentItems.filter((itemKey) => !matchingManualItemKeySet.has(itemKey)),
-      )
-    }
-
-    setManualShoppingItems((currentItems) => {
-      if (currentItems.some((item) => item.trim().toLowerCase() === normalized)) {
-        return currentItems
-      }
-
-      return [...currentItems, itemLabel]
-    })
-  }
-
-  function addAllFrequentShoppingItems() {
-    if (frequentShoppingItems.length === 0) {
-      return
-    }
-
-    const frequentItemLabels = frequentShoppingItems
-      .map((item) => item.label.trim())
-      .filter(Boolean)
-    const frequentNormalizedItems = new Set(frequentItemLabels.map((item) => item.toLowerCase()))
-    const matchingManualItemKeys = manualShoppingItems
-      .map((item, itemIndex) => ({
-        normalized: item.trim().toLowerCase(),
-        key: manualShoppingItemKey(item, itemIndex),
-      }))
-      .filter((item) => frequentNormalizedItems.has(item.normalized))
-      .map((item) => item.key)
-
-    if (matchingManualItemKeys.length > 0) {
-      const matchingManualItemKeySet = new Set(matchingManualItemKeys)
-
-      setCompletedShoppingItems((currentItems) =>
-        currentItems.filter((itemKey) => !matchingManualItemKeySet.has(itemKey)),
-      )
-      setRemovedShoppingItems((currentItems) =>
-        currentItems.filter((itemKey) => !matchingManualItemKeySet.has(itemKey)),
-      )
-    }
-
-    setManualShoppingItems((currentItems) => {
-      const existingItems = new Set(currentItems.map((item) => item.trim().toLowerCase()))
-      const itemsToAdd = frequentItemLabels
-        .filter((item) => item && !existingItems.has(item.toLowerCase()))
-
-      return itemsToAdd.length > 0 ? [...currentItems, ...itemsToAdd] : currentItems
-    })
-  }
-
-  function saveCuratedFrequentItems() {
-    const newItems = curatedFrequentInput
-      .split('\n')
-      .map((item) => item.trim())
-      .filter(Boolean)
-
-    setCuratedFrequentItems(newItems)
-  }
-
-  function saveItemsToHistory(itemLabels: string[]) {
-    const cleanedItems = itemLabels
-      .map((item) => item.trim())
-      .filter(Boolean)
-
-    if (cleanedItems.length === 0) {
-      return
-    }
-
-    setShoppingHistoryItems((currentItems) => [...currentItems, ...cleanedItems])
-  }
-
   function markShoppingItemsDone(itemKeys: string[]) {
     setCompletedShoppingItems((currentItems) =>
       Array.from(new Set([...currentItems, ...itemKeys])),
@@ -1146,11 +1004,6 @@ function App() {
     setNeededShoppingItems((currentItems) =>
       currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
     )
-    saveItemsToHistory(
-      Object.values(visibleGroceryByAisle)
-        .flat()
-        .flatMap((item) => Array.from({ length: item.count }, () => item.item)),
-    )
     setRemovedShoppingItems((currentItems) => [
       ...currentItems.filter((itemKey) => !visibleItemKeySet.has(itemKey)),
       ...visibleItemKeys,
@@ -1164,9 +1017,6 @@ function App() {
 
     const doneItemKeys = doneShoppingItems.flatMap((item) => item.keys)
     const doneItemKeySet = new Set(doneItemKeys)
-    saveItemsToHistory(
-      doneShoppingItems.flatMap((item) => Array.from({ length: item.count }, () => item.item)),
-    )
     setCompletedShoppingItems((currentItems) =>
       currentItems.filter((itemKey) => !doneItemKeySet.has(itemKey)),
     )
@@ -1561,48 +1411,6 @@ function App() {
                     Add Items
                   </button>
                 </div>
-              </div>
-              <div className="import-card shopping-bulk-actions">
-                <h4>Frequently Bought</h4>
-                <p className="summary">
-                  Based on items from previous shopping lists you cleared.
-                </p>
-                <label className="searchbox">
-                  <span>Always include (one item per line)</span>
-                  <textarea
-                    value={curatedFrequentInput}
-                    onChange={(event) => setCuratedFrequentInput(event.target.value)}
-                    placeholder={'bananas\neggs\ncoffee beans'}
-                  />
-                </label>
-                <button className="action-button action-button--secondary" onClick={saveCuratedFrequentItems}>
-                  Save Always Include List
-                </button>
-                {curatedFrequentItems.length > 0 ? (
-                  <p className="summary">
-                    Always include: {curatedFrequentItems.join(', ')}
-                  </p>
-                ) : null}
-                {frequentShoppingItems.length > 0 ? (
-                  <>
-                    <button className="action-button" onClick={addAllFrequentShoppingItems}>
-                      Add All Frequent Items
-                    </button>
-                    <ul className="plain-list">
-                      {frequentShoppingItems.map((item) => (
-                        <li key={item.normalized}>
-                          <button className="link-button" onClick={() => addFrequentShoppingItem(item.label)}>
-                            Add {item.label} {item.count > 0 ? `(${item.count}x)` : item.isCurated ? '(Always)' : ''}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ) : (
-                  <p className="summary">
-                    Clear a few shopping lists and your frequent items will show up here.
-                  </p>
-                )}
               </div>
             </div>
 

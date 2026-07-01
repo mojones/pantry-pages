@@ -38,8 +38,6 @@ type PersistedAppState = {
   neededShoppingItems: string[]
   completedShoppingItems: string[]
   removedShoppingItems: string[]
-  shoppingHistoryItems: string[]
-  curatedFrequentItems: string[]
   categoryOverrides: Record<string, string>
 }
 
@@ -62,8 +60,6 @@ const defaultPersistedState: PersistedAppState = {
   neededShoppingItems: [],
   completedShoppingItems: [],
   removedShoppingItems: [],
-  shoppingHistoryItems: [],
-  curatedFrequentItems: [],
   categoryOverrides: {},
 }
 
@@ -212,8 +208,6 @@ function normalizePersistedState(value: unknown): PersistedAppState {
     neededShoppingItems: normalizeStringArray(value.neededShoppingItems).map((item) => item.trim()).filter(Boolean),
     completedShoppingItems: normalizeStringArray(value.completedShoppingItems).map((item) => item.trim()).filter(Boolean),
     removedShoppingItems: normalizeStringArray(value.removedShoppingItems).map((item) => item.trim()).filter(Boolean),
-    shoppingHistoryItems: normalizeStringArray(value.shoppingHistoryItems).map((item) => item.trim()).filter(Boolean),
-    curatedFrequentItems: normalizeStringArray(value.curatedFrequentItems).map((item) => item.trim()).filter(Boolean),
     categoryOverrides: normalizeStringRecord(value.categoryOverrides),
   }
 }
