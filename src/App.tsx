@@ -9,13 +9,20 @@ import {
   type Recipe,
 } from './recipes'
 import type { ImportedRecipePayload } from './recipeImport'
+import {
+  buildManualRecipe,
+  emptyManualRecipeForm,
+  parseRecipeTextList,
+  recipeToManualForm,
+  type ManualRecipeForm,
+} from './manualRecipe'
 
 type PlannedRecipe = {
   recipeId: string
   excludedIngredientKeys: string[]
 }
 
-type View = 'cookbook' | 'recipe' | 'planner' | 'shopping' | 'categories' | 'import'
+type View = 'cookbook' | 'recipe' | 'planner' | 'shopping' | 'categories' | 'import' | 'manual'
 
 type AppHistoryState = {
   pantryPagesView?: View
@@ -57,6 +64,7 @@ type CategoryIngredient = {
 
 const initialPlannedRecipes: PlannedRecipe[] = []
 const baseRecipeIds = new Set(recipes.map((recipe) => recipe.id))
+const baseRecipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]))
 const baseRecipeNotes = Object.fromEntries(
   recipes.map((recipe) => [recipe.id, recipe.notes]),
 ) as Record<string, string>
@@ -68,6 +76,7 @@ const views: { id: View; label: string; caption: string; icon: string }[] = [
   { id: 'shopping', label: 'Shopping List', caption: 'Generate groceries from the plan', icon: '🛒' },
   { id: 'categories', label: 'Categories', caption: 'Fix ingredient aisles', icon: '⇄' },
   { id: 'import', label: 'Import', caption: 'Create a recipe from a URL', icon: '＋' },
+  { id: 'manual', label: 'Manual', caption: 'Add or edit recipes by hand', icon: '✎' },
 ]
 
 const recipePlaceholderImage = '/recipe-placeholder.svg'
@@ -262,10 +271,12 @@ function handleRecipeImageError(event: React.SyntheticEvent<HTMLImageElement>) {
 }
 
 function mergeRecipeLibrary(importedRecipes: Recipe[]) {
-  const seenRecipeIds = new Set(baseRecipeIds)
+  const savedRecipesById = new Map(importedRecipes.map((recipe) => [recipe.id, recipe]))
+  const mergedBaseRecipes = recipes.map((recipe) => savedRecipesById.get(recipe.id) ?? recipe)
+  const seenRecipeIds = new Set(mergedBaseRecipes.map((recipe) => recipe.id))
 
   return [
-    ...recipes,
+    ...mergedBaseRecipes,
     ...importedRecipes.filter((recipe) => {
       if (seenRecipeIds.has(recipe.id)) {
         return false
@@ -322,6 +333,9 @@ function App() {
   const [importError, setImportError] = useState('')
   const [importStatus, setImportStatus] = useState<'idle' | 'loading'>('idle')
   const [lastImportedRecipeTitle, setLastImportedRecipeTitle] = useState('')
+  const [manualRecipeForm, setManualRecipeForm] = useState<ManualRecipeForm>(emptyManualRecipeForm)
+  const [manualEditingRecipeId, setManualEditingRecipeId] = useState('')
+  const [manualRecipeMessage, setManualRecipeMessage] = useState('')
   const [manualShoppingItems, setManualShoppingItems] = useState<string[]>([])
   const [neededShoppingItems, setNeededShoppingItems] = useState<string[]>([])
   const [completedShoppingItems, setCompletedShoppingItems] = useState<string[]>([])
@@ -448,7 +462,10 @@ function App() {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         try {
-          const importedRecipes = recipeLibrary.filter((recipe) => !baseRecipeIds.has(recipe.id))
+          const importedRecipes = recipeLibrary.filter((recipe) => {
+            const baseRecipe = baseRecipesById.get(recipe.id)
+            return !baseRecipe || JSON.stringify(recipe) !== JSON.stringify(baseRecipe)
+          })
           const persistedNotes = Object.fromEntries(
             Object.entries(recipeNotes).filter(
               ([recipeId, note]) => !baseRecipeIds.has(recipeId) || note.trim(),
@@ -513,6 +530,10 @@ function App() {
   const commonSearchTags = useMemo(
     () => collectCommonSearchTags(recipeLibrary),
     [recipeLibrary],
+  )
+  const manualRecipeIngredients = useMemo(
+    () => parseRecipeTextList(manualRecipeForm.ingredientsText),
+    [manualRecipeForm.ingredientsText],
   )
 
   const visibleRecipes = recipeLibrary.filter((recipe) => {
@@ -823,6 +844,56 @@ function App() {
     } finally {
       setImportStatus('idle')
     }
+  }
+
+  function updateManualRecipeField(field: keyof ManualRecipeForm, value: string) {
+    setManualRecipeForm((currentForm) => ({
+      ...currentForm,
+      [field]: value,
+    }))
+    setManualRecipeMessage('')
+  }
+
+  function startNewManualRecipe() {
+    setManualRecipeForm(emptyManualRecipeForm)
+    setManualEditingRecipeId('')
+    setManualRecipeMessage('')
+    setActiveView('manual')
+  }
+
+  function editRecipe(recipe: Recipe) {
+    setManualRecipeForm(recipeToManualForm(recipe))
+    setManualEditingRecipeId(recipe.id)
+    setManualRecipeMessage(`Editing ${recipe.title}`)
+    setActiveView('manual')
+  }
+
+  function saveManualRecipe() {
+    const savedRecipe = buildManualRecipe(
+      manualRecipeForm,
+      new Set(recipeLibrary.map((recipe) => recipe.id)),
+      manualEditingRecipeId,
+    )
+
+    setRecipeLibrary((currentRecipes) => {
+      if (manualEditingRecipeId) {
+        return currentRecipes.map((recipe) =>
+          recipe.id === manualEditingRecipeId ? savedRecipe : recipe,
+        )
+      }
+
+      return [...currentRecipes, savedRecipe]
+    })
+    setRecipeNotes((currentNotes) => ({
+      ...currentNotes,
+      [savedRecipe.id]: currentNotes[savedRecipe.id] ?? '',
+    }))
+    setSelectedRecipeId(savedRecipe.id)
+    setSearch('')
+    setRecipeScale(1)
+    setManualEditingRecipeId(savedRecipe.id)
+    setManualRecipeMessage(`Saved ${savedRecipe.title}`)
+    setActiveView('recipe')
   }
 
   function toggleIngredientSelection(key: string) {
@@ -1214,6 +1285,16 @@ function App() {
                   </div>
                   <div className="card-actions">
                     <button
+                      className="link-button recipe-card__edit-button"
+                      aria-label={`Edit ${recipe.title}`}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        editRecipe(recipe)
+                      }}
+                    >
+                      <span aria-hidden="true">✎</span>
+                    </button>
+                    <button
                       className="link-button recipe-card__plan-button"
                       aria-label={`Add ${recipe.title} to meal plan`}
                       onClick={(event) => {
@@ -1331,6 +1412,9 @@ function App() {
               </div>
               <button className="action-button" onClick={() => openIngredientPicker(selectedRecipe.id)}>
                 Add To Planner
+              </button>
+              <button className="action-button action-button--secondary" onClick={() => editRecipe(selectedRecipe)}>
+                Edit Recipe
               </button>
             </div>
 
@@ -1752,6 +1836,142 @@ function App() {
                   </article>
                 )
               })}
+            </div>
+          </section>
+        ) : null}
+
+        {activeView === 'manual' ? (
+          <section className="panel panel--wide">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Manual Recipe</p>
+                <h3>{manualEditingRecipeId ? 'Edit Recipe' : 'Add Recipe'}</h3>
+              </div>
+              <div className="list-header-actions">
+                <span className="badge">{manualRecipeIngredients.length} ingredients parsed</span>
+                <button className="action-button action-button--secondary" onClick={startNewManualRecipe}>
+                  New Recipe
+                </button>
+              </div>
+            </div>
+
+            <div className="manual-layout">
+              <div className="import-card manual-form">
+                <div className="manual-form__grid">
+                  <label className="searchbox manual-form__wide">
+                    <span>Title</span>
+                    <input
+                      value={manualRecipeForm.title}
+                      onChange={(event) => updateManualRecipeField('title', event.target.value)}
+                      placeholder="Recipe title"
+                    />
+                  </label>
+                  <label className="searchbox">
+                    <span>Author</span>
+                    <input
+                      value={manualRecipeForm.author}
+                      onChange={(event) => updateManualRecipeField('author', event.target.value)}
+                      placeholder="Meera Sodha"
+                    />
+                  </label>
+                  <label className="searchbox">
+                    <span>Source</span>
+                    <input
+                      value={manualRecipeForm.source}
+                      onChange={(event) => updateManualRecipeField('source', event.target.value)}
+                      placeholder="Book, site, or notebook"
+                    />
+                  </label>
+                  <label className="searchbox">
+                    <span>Section</span>
+                    <input
+                      value={manualRecipeForm.section}
+                      onChange={(event) => updateManualRecipeField('section', event.target.value)}
+                      placeholder="Dinner"
+                    />
+                  </label>
+                  <label className="searchbox">
+                    <span>Tags</span>
+                    <input
+                      value={manualRecipeForm.tags}
+                      onChange={(event) => updateManualRecipeField('tags', event.target.value)}
+                      placeholder="vegan, quick"
+                    />
+                  </label>
+                  <label className="searchbox">
+                    <span>Time</span>
+                    <input
+                      value={manualRecipeForm.time}
+                      onChange={(event) => updateManualRecipeField('time', event.target.value)}
+                      placeholder="30 mins"
+                    />
+                  </label>
+                  <label className="searchbox">
+                    <span>Servings</span>
+                    <input
+                      value={manualRecipeForm.servings}
+                      onChange={(event) => updateManualRecipeField('servings', event.target.value)}
+                      placeholder="Serves 4"
+                    />
+                  </label>
+                  <label className="searchbox manual-form__wide">
+                    <span>Image URL or path</span>
+                    <input
+                      value={manualRecipeForm.image}
+                      onChange={(event) => updateManualRecipeField('image', event.target.value)}
+                      placeholder="/source_images/example.jpg"
+                    />
+                  </label>
+                  <label className="searchbox manual-form__wide">
+                    <span>Summary</span>
+                    <textarea
+                      value={manualRecipeForm.summary}
+                      onChange={(event) => updateManualRecipeField('summary', event.target.value)}
+                      placeholder="A short description for the recipe card."
+                    />
+                  </label>
+                  <label className="searchbox manual-form__wide">
+                    <span>Ingredients, one per line</span>
+                    <textarea
+                      value={manualRecipeForm.ingredientsText}
+                      onChange={(event) => updateManualRecipeField('ingredientsText', event.target.value)}
+                      placeholder={'2 tbsp olive oil\n1 onion, diced\n400g chickpeas'}
+                    />
+                  </label>
+                  <label className="searchbox manual-form__wide">
+                    <span>Method, one step per line</span>
+                    <textarea
+                      value={manualRecipeForm.stepsText}
+                      onChange={(event) => updateManualRecipeField('stepsText', event.target.value)}
+                      placeholder={'Warm the oil.\nAdd the onion.\nSimmer until done.'}
+                    />
+                  </label>
+                </div>
+
+                <div className="planner-actions">
+                  {manualRecipeMessage ? <p className="import-message">{manualRecipeMessage}</p> : null}
+                  <button className="action-button" onClick={saveManualRecipe}>
+                    {manualEditingRecipeId ? 'Save Changes' : 'Add Recipe'}
+                  </button>
+                </div>
+              </div>
+
+              <article className="import-card manual-preview">
+                <p className="eyebrow">Parsed Preview</p>
+                <h4>Ingredients</h4>
+                {manualRecipeIngredients.length > 0 ? (
+                  <ul className="plain-list">
+                    {manualRecipeIngredients.map((ingredient, ingredientIndex) => (
+                      <li key={`${ingredient.item}-${ingredient.amount}-${ingredientIndex}`}>
+                        <span>{ingredient.item}</span>
+                        <strong>{ingredient.amount || 'As listed'}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="summary">Paste ingredients to see how they will be split for shopping.</p>
+                )}
+              </article>
             </div>
           </section>
         ) : null}

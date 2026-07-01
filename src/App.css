@@ -60,7 +60,7 @@
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   padding: 12px;
   margin-bottom: 20px;
@@ -328,6 +328,29 @@ textarea {
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
   margin-top: 18px;
   align-items: start;
+}
+
+.manual-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.8fr);
+  gap: 20px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+.manual-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.manual-form__wide {
+  grid-column: 1 / -1;
+}
+
+.manual-preview {
+  position: sticky;
+  top: 18px;
 }
 
 .shopping-tools {
@@ -820,8 +843,14 @@ textarea {
   .grocery-grid,
   .category-board,
   .tabs,
-  .import-layout {
+  .import-layout,
+  .manual-layout,
+  .manual-form__grid {
     grid-template-columns: 1fr;
+  }
+
+  .manual-preview {
+    position: static;
   }
 }
 
@@ -831,7 +860,7 @@ textarea {
   }
 
   .tabs {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .topbar,
