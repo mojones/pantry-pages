@@ -190,6 +190,7 @@ h4 {
 }
 
 .searchbox,
+.sort-control,
 .notes,
 .planner-hint,
 .ingredient-picker,
@@ -201,6 +202,7 @@ h4 {
 }
 
 .searchbox span,
+.sort-control span,
 .notes span,
 .planner-hint span {
   font-size: 0.88rem;
@@ -234,6 +236,13 @@ textarea {
 textarea {
   min-height: 120px;
   resize: vertical;
+}
+
+.cookbook-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.35fr);
+  gap: 16px;
+  align-items: end;
 }
 
 .recipe-grid {
@@ -844,6 +853,7 @@ textarea {
   .category-board,
   .tabs,
   .import-layout,
+  .cookbook-tools,
   .manual-layout,
   .manual-form__grid {
     grid-template-columns: 1fr;

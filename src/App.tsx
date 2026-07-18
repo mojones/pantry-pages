@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { sortRecipesByShoppingRecency } from './recipeSorting'
 import {
   aisleCategories,
   buildImportedRecipe,
@@ -23,6 +24,7 @@ type PlannedRecipe = {
 }
 
 type View = 'cookbook' | 'recipe' | 'planner' | 'shopping' | 'categories' | 'import' | 'manual'
+type RecipeSort = 'library' | 'shopping-recent'
 
 type AppHistoryState = {
   pantryPagesView?: View
@@ -319,6 +321,7 @@ function App() {
   const [activeView, setActiveView] = useState<View>('cookbook')
   const [selectedRecipeId, setSelectedRecipeId] = useState(recipes[0].id)
   const [search, setSearch] = useState('')
+  const [recipeSort, setRecipeSort] = useState<RecipeSort>('library')
   const [plannedRecipesState, setPlannedRecipesState] = useState(initialPlannedRecipes)
   const [recipeNotes, setRecipeNotes] = useState(baseRecipeNotes)
   const [ingredientPickerOpen, setIngredientPickerOpen] = useState(false)
@@ -523,7 +526,7 @@ function App() {
     [manualRecipeForm.ingredientsText],
   )
 
-  const visibleRecipes = recipeLibrary.filter((recipe) => {
+  const filteredRecipes = recipeLibrary.filter((recipe) => {
     const haystack = [
       recipe.title,
       recipe.author,
@@ -537,6 +540,13 @@ function App() {
 
     return haystack.includes(search.trim().toLowerCase())
   })
+  const visibleRecipes =
+    recipeSort === 'shopping-recent'
+      ? sortRecipesByShoppingRecency(
+          filteredRecipes,
+          plannedRecipesState.map((plannedRecipe) => plannedRecipe.recipeId),
+        )
+      : filteredRecipes
   const displayedRecipes = visibleRecipes.slice(0, visibleRecipeCount)
   const hasMoreRecipes = displayedRecipes.length < visibleRecipes.length
 
@@ -686,7 +696,7 @@ function App() {
 
   useEffect(() => {
     setVisibleRecipeCount(recipeBatchSize)
-  }, [recipeLibrary.length, search])
+  }, [recipeLibrary.length, recipeSort, search])
 
   useEffect(() => {
     if (activeView !== 'cookbook' || !hasMoreRecipes) {
@@ -1084,15 +1094,27 @@ function App() {
               <span className="badge">{visibleRecipes.length} matches</span>
             </div>
 
-            <label className="searchbox">
-              <span>Search by title, ingredient, author, or tag</span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                list="common-search-tags"
-                placeholder="Try 'miso', 'lentils', or 'Meera'"
-              />
-            </label>
+            <div className="cookbook-tools">
+              <label className="searchbox">
+                <span>Search by title, ingredient, author, or tag</span>
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  list="common-search-tags"
+                  placeholder="Try 'miso', 'lentils', or 'Meera'"
+                />
+              </label>
+              <label className="sort-control">
+                <span>Sort recipes</span>
+                <select
+                  value={recipeSort}
+                  onChange={(event) => setRecipeSort(event.target.value as RecipeSort)}
+                >
+                  <option value="library">Library order</option>
+                  <option value="shopping-recent">Most recently added to shopping</option>
+                </select>
+              </label>
+            </div>
             <datalist id="common-search-tags">
               {commonSearchTags.map((tag) => (
                 <option key={tag} value={tag} />
