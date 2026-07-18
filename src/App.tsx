@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { annotateMethodStep, scaleIngredientAmount } from './methodAmounts'
 import { sortRecipesByShoppingRecency } from './recipeSorting'
 import {
   aisleCategories,
@@ -69,36 +70,28 @@ const baseRecipeNotes = Object.fromEntries(
   recipes.map((recipe) => [recipe.id, recipe.notes]),
 ) as Record<string, string>
 
-const views: { id: View; label: string; caption: string; icon: string }[] = [
+const views: { id: View; label: string; mobileLabel?: string; caption: string; icon: string }[] = [
   { id: 'cookbook', label: 'Cookbook', caption: 'Browse and filter the library', icon: '📚' },
   { id: 'recipe', label: 'Recipe', caption: 'Read and edit the selected recipe', icon: '🍳' },
   { id: 'planner', label: 'Planner', caption: 'Collect recipes you want to make', icon: '📅' },
-  { id: 'shopping', label: 'Shopping List', caption: 'Generate groceries from the plan', icon: '🛒' },
+  {
+    id: 'shopping',
+    label: 'Shopping List',
+    mobileLabel: 'Shopping',
+    caption: 'Generate groceries from the plan',
+    icon: '🛒',
+  },
   { id: 'categories', label: 'Categories', caption: 'Fix ingredient aisles', icon: '⇄' },
   { id: 'import', label: 'Import', caption: 'Create a recipe from a URL', icon: '＋' },
   { id: 'manual', label: 'Manual', caption: 'Add or edit recipes by hand', icon: '✎' },
 ]
+const mobilePrimaryViewIds = new Set<View>(['cookbook', 'planner', 'shopping'])
+const mobileUtilityViews = views.filter((view) => !mobilePrimaryViewIds.has(view.id))
 
 const recipePlaceholderImage = '/recipe-placeholder.svg'
 const scaleOptions = [0.5, 1, 2, 3]
 const recipeBatchSize = 36
 const viewIds = new Set<View>(views.map((view) => view.id))
-type ParsedAmountToken = {
-  value: number
-  plus: boolean
-}
-
-const unicodeFractions: Record<string, number> = {
-  '¼': 0.25,
-  '½': 0.5,
-  '¾': 0.75,
-  '⅓': 1 / 3,
-  '⅔': 2 / 3,
-  '⅛': 0.125,
-  '⅜': 0.375,
-  '⅝': 0.625,
-  '⅞': 0.875,
-}
 
 function ingredientKey(ingredient: Ingredient) {
   return `${ingredient.item}__${ingredient.amount}`
@@ -152,114 +145,6 @@ function groupGroceryItems(items: RawGroceryListItem[]) {
   return Array.from(groupedItems.values()).sort((left, right) =>
     left.item.localeCompare(right.item),
   )
-}
-
-function parseAmountToken(token: string): ParsedAmountToken | null {
-  const trimmed = token.trim()
-
-  if (!trimmed) {
-    return null
-  }
-
-  const plus = trimmed.endsWith('+')
-  const withoutPlus = plus ? trimmed.slice(0, -1) : trimmed
-
-  if (/^\d+\s+\d+\/\d+$/.test(withoutPlus)) {
-    const [wholeNumber, fraction] = withoutPlus.split(/\s+/)
-    const parsedFraction = parseAmountToken(fraction)
-
-    if (!parsedFraction) {
-      return null
-    }
-
-    return { value: Number(wholeNumber) + parsedFraction.value, plus }
-  }
-
-  if (/^\d+[¼½¾⅓⅔⅛⅜⅝⅞]$/.test(withoutPlus)) {
-    const wholeNumber = withoutPlus.slice(0, -1)
-    const fraction = withoutPlus.slice(-1)
-    const parsedFraction = parseAmountToken(fraction)
-
-    if (!parsedFraction) {
-      return null
-    }
-
-    return { value: Number(wholeNumber) + parsedFraction.value, plus }
-  }
-
-  if (unicodeFractions[withoutPlus] !== undefined) {
-    return { value: unicodeFractions[withoutPlus], plus }
-  }
-
-  if (/^\d+\/\d+$/.test(withoutPlus)) {
-    const [numerator, denominator] = withoutPlus.split('/').map(Number)
-    return denominator ? { value: numerator / denominator, plus } : null
-  }
-
-  if (/^\d+(?:\.\d+)?$/.test(withoutPlus)) {
-    return { value: Number(withoutPlus), plus }
-  }
-
-  return null
-}
-
-function formatScaledNumber(value: number) {
-  const rounded = Math.round(value * 100) / 100
-  const whole = Math.trunc(rounded)
-  const remainder = rounded - whole
-  const fractionChoices = [
-    [1 / 8, '1/8'],
-    [1 / 4, '1/4'],
-    [1 / 3, '1/3'],
-    [3 / 8, '3/8'],
-    [1 / 2, '1/2'],
-    [5 / 8, '5/8'],
-    [2 / 3, '2/3'],
-    [3 / 4, '3/4'],
-    [7 / 8, '7/8'],
-  ] as const
-
-  if (Math.abs(remainder) < 0.01) {
-    return String(whole)
-  }
-
-  const bestFraction = fractionChoices.find(([fraction]) => Math.abs(remainder - fraction) < 0.03)
-
-  if (bestFraction) {
-    const [, label] = bestFraction
-
-    if (whole === 0) {
-      return label
-    }
-
-    return `${whole} ${label}`
-  }
-
-  return rounded.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')
-}
-
-function scaleAmountValue(value: string, factor: number) {
-  return value.replace(
-    /\d+\s+\d+\/\d+\+?|\d+[¼½¾⅓⅔⅛⅜⅝⅞]\+?|\d+(?:\.\d+)?\+?|\d+\/\d+|[¼½¾⅓⅔⅛⅜⅝⅞]/g,
-    (token) => {
-    const parsedToken = parseAmountToken(token)
-
-    if (!parsedToken) {
-      return token
-    }
-
-    const scaledValue = formatScaledNumber(parsedToken.value * factor)
-    return parsedToken.plus ? `${scaledValue}+` : scaledValue
-    },
-  )
-}
-
-function scaleIngredientAmount(amount: string, factor: number) {
-  if (!amount || factor === 1) {
-    return amount
-  }
-
-  return scaleAmountValue(amount, factor)
 }
 
 function resolveRecipeImage(image: string) {
@@ -322,12 +207,14 @@ function App() {
   const [selectedRecipeId, setSelectedRecipeId] = useState(recipes[0].id)
   const [search, setSearch] = useState('')
   const [recipeSort, setRecipeSort] = useState<RecipeSort>('library')
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const [plannedRecipesState, setPlannedRecipesState] = useState(initialPlannedRecipes)
   const [recipeNotes, setRecipeNotes] = useState(baseRecipeNotes)
   const [ingredientPickerOpen, setIngredientPickerOpen] = useState(false)
   const [ingredientSelection, setIngredientSelection] = useState<string[]>([])
   const [pickerRecipeId, setPickerRecipeId] = useState(recipes[0].id)
   const [recipeScale, setRecipeScale] = useState(1)
+  const [showMethodAmounts, setShowMethodAmounts] = useState(false)
   const [importUrl, setImportUrl] = useState(
     'https://www.theguardian.com/food/2025/jul/19/vegan-recipe-sweetcorn-hiyashi-meera-sodha',
   )
@@ -1058,6 +945,11 @@ function App() {
     })
   }
 
+  function switchView(view: View) {
+    setActiveView(view)
+    setMobileNavigationOpen(false)
+  }
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -1066,22 +958,73 @@ function App() {
       </header>
 
       <nav className="tabs" aria-label="Primary views">
-        {views.map((view) => (
-          <button
-            key={view.id}
-            className={activeView === view.id ? 'tab tab--active' : 'tab'}
-            onClick={() => setActiveView(view.id)}
-            aria-label={`${view.label}: ${view.caption}`}
-            title={view.label}
-          >
-            <span className="tab__icon" aria-hidden="true">
-              {view.icon}
-            </span>
-            <strong className="tab__label">{view.label}</strong>
-            <span className="tab__caption">{view.caption}</span>
-          </button>
-        ))}
+        {views.map((view) => {
+          const isMobileUtilityView = !mobilePrimaryViewIds.has(view.id)
+
+          return (
+            <button
+              key={view.id}
+              className={[
+                'tab',
+                activeView === view.id ? 'tab--active' : '',
+                isMobileUtilityView ? 'tab--utility' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => switchView(view.id)}
+              aria-current={activeView === view.id ? 'page' : undefined}
+              aria-label={`${view.label}: ${view.caption}`}
+              title={view.label}
+            >
+              <span className="tab__icon" aria-hidden="true">
+                {view.icon}
+              </span>
+              <strong className="tab__label">
+                <span className="tab__desktop-label">{view.label}</span>
+                <span className="tab__mobile-label">{view.mobileLabel ?? view.label}</span>
+              </strong>
+              <span className="tab__caption">{view.caption}</span>
+            </button>
+          )
+        })}
+        <button
+          className={
+            mobileNavigationOpen || !mobilePrimaryViewIds.has(activeView)
+              ? 'mobile-more-tab mobile-more-tab--active'
+              : 'mobile-more-tab'
+          }
+          onClick={() => setMobileNavigationOpen((isOpen) => !isOpen)}
+          aria-expanded={mobileNavigationOpen}
+          aria-controls="mobile-more-views"
+          aria-label="More views"
+        >
+          <span className="mobile-more-tab__icon" aria-hidden="true">
+            •••
+          </span>
+          <strong className="mobile-more-tab__label">More</strong>
+        </button>
       </nav>
+
+      {mobileNavigationOpen ? (
+        <section id="mobile-more-views" className="mobile-navigation-menu" aria-label="More views">
+          {mobileUtilityViews.map((view) => (
+            <button
+              key={view.id}
+              className={
+                activeView === view.id
+                  ? 'mobile-navigation-menu__item mobile-navigation-menu__item--active'
+                  : 'mobile-navigation-menu__item'
+              }
+              onClick={() => switchView(view.id)}
+              aria-current={activeView === view.id ? 'page' : undefined}
+            >
+              <span aria-hidden="true">{view.icon}</span>
+              <span>{view.label}</span>
+              <small>{view.caption}</small>
+            </button>
+          ))}
+        </section>
+      ) : null}
 
       <main className="view-shell">
         {activeView === 'cookbook' ? (
@@ -1264,10 +1207,27 @@ function App() {
               </div>
 
               <div>
-                <h4>Method</h4>
+                <div className="detail-section__header detail-section__header--method">
+                  <h4>Method</h4>
+                  <button
+                    className={
+                      showMethodAmounts
+                        ? 'method-amount-toggle method-amount-toggle--active'
+                        : 'method-amount-toggle'
+                    }
+                    onClick={() => setShowMethodAmounts((isVisible) => !isVisible)}
+                    aria-pressed={showMethodAmounts}
+                  >
+                    {showMethodAmounts ? 'Hide ingredient amounts' : 'Show ingredient amounts'}
+                  </button>
+                </div>
                 <ol className="step-list">
                   {selectedRecipe.steps.map((step) => (
-                    <li key={step}>{step}</li>
+                    <li key={step}>
+                      {showMethodAmounts
+                        ? annotateMethodStep(step, selectedRecipe.ingredients, recipeScale)
+                        : step}
+                    </li>
                   ))}
                 </ol>
               </div>
@@ -1317,9 +1277,11 @@ function App() {
                 <p>{selectedRecipe.title}</p>
               </div>
               <div className="planner-banner__actions">
-                <button className="action-button action-button--secondary" onClick={clearAllPlans}>
-                  Clear All Recipes
-                </button>
+                {plannedRecipes.length > 0 ? (
+                  <button className="action-button action-button--secondary" onClick={clearAllPlans}>
+                    Clear All Recipes
+                  </button>
+                ) : null}
                 <button className="action-button" onClick={() => setActiveView('recipe')}>
                   Review Recipe
                 </button>
