@@ -3,6 +3,7 @@ import crypto from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { registerAppApiRoutes } from './src/recipeApi'
+import { createChatApi } from './src/chatApi'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -234,6 +235,8 @@ app.get('/healthz', (_request, response) => {
   response.json({ ok: true })
 })
 
+app.use('/api/v1', createChatApi(path.join(__dirname, 'source_recipes')))
+
 app.use(express.urlencoded({ extended: false }))
 
 app.get('/login', (request, response) => {
@@ -322,8 +325,8 @@ app.use((request, response, next) => {
   response.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 
-const port = Number(process.env.PORT) || 3000
-
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Pantry Pages listening on http://0.0.0.0:${port}`)
+const port = process.env.PORT === undefined ? 3000 : Number(process.env.PORT)
+const listener = app.listen(port, '0.0.0.0', () => {
+  const address = listener.address()
+  console.log(`Pantry Pages listening on http://0.0.0.0:${typeof address === 'object' && address ? address.port : port}`)
 })

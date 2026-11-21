@@ -11,6 +11,10 @@ This project currently uses Vite for the frontend and a Vite-mounted import API 
 Set `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD` in Railway before exposing the service publicly.
 The server leaves `/healthz` open for platform health checks and protects the app, assets, and API with HTTP Basic Auth.
 
+## Chat API
+
+The optional [Pantry Pages chat API](docs/chat-api.md) uses its own bearer token for cookbook search, recipe creation, planner updates, and shopping-list reads.
+
 ## Vite Template Notes
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

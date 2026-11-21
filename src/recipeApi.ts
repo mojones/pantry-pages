@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
 import { importRecipeFromUrl } from './recipeImport'
@@ -237,6 +238,22 @@ async function writePersistedState(state: PersistedAppState) {
   await rename(tempFilePath, stateFilePath)
 }
 
+function stateVersion(state: PersistedAppState) {
+  return `"${createHash('sha256').update(JSON.stringify(state)).digest('hex')}"`
+}
+
+// Serialize read-modify-write operations and browser saves in this process.
+let pendingWrite: Promise<unknown> = Promise.resolve()
+function updatePersistedState<T>(update: (current: PersistedAppState) => { state?: PersistedAppState; result: T }) {
+  const write = pendingWrite.then(async () => {
+    const { state, result } = update(await readPersistedState())
+    if (state) await writePersistedState(state)
+    return result
+  })
+  pendingWrite = write.catch(() => {})
+  return write
+}
+
 function registerAppApiRoutes(middlewares: MiddlewareStack) {
   middlewares.use('/api/import-recipe', async (request, response, next) => {
     if (request.method !== 'POST') {
@@ -270,6 +287,8 @@ function registerAppApiRoutes(middlewares: MiddlewareStack) {
     if (request.method === 'GET') {
       try {
         const state = await readPersistedState()
+        response.setHeader('ETag', stateVersion(state))
+        response.setHeader('Cache-Control', 'no-store')
         sendJson(response, 200, state)
       } catch (error) {
         const message =
@@ -284,7 +303,17 @@ function registerAppApiRoutes(middlewares: MiddlewareStack) {
       try {
         const body = await readJsonBody(request)
         const state = normalizePersistedState(body)
-        await writePersistedState(state)
+        const expected = request.headers['if-match']
+        const status = await updatePersistedState((current) => {
+          if (!expected && process.env.PANTRY_API_TOKEN?.trim()) return { result: 428 }
+          if (expected && expected !== stateVersion(current)) return { result: 412 }
+          return { state, result: 200 }
+        })
+        if (status !== 200) {
+          sendJson(response, status, { error: 'Saved data changed or your tab is out of date. Copy any unsaved edits, then reload Pantry Pages.' })
+          return
+        }
+        response.setHeader('ETag', stateVersion(state))
         sendJson(response, 200, { ok: true })
       } catch (error) {
         const message =
@@ -304,4 +333,4 @@ function registerAppApiRoutes(middlewares: MiddlewareStack) {
   })
 }
 
-export { registerAppApiRoutes }
+export { registerAppApiRoutes, readPersistedState, updatePersistedState }

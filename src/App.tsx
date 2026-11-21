@@ -6,7 +6,6 @@ import {
   aisleCategories,
   buildImportedRecipe,
   recipes,
-  splitIngredient,
   type Ingredient,
   type Recipe,
 } from './recipes'
@@ -19,10 +18,7 @@ import {
   type ManualRecipeForm,
 } from './manualRecipe'
 
-type PlannedRecipe = {
-  recipeId: string
-  excludedIngredientKeys: string[]
-}
+import { buildShoppingList, formatIngredient, formatShoppingItemLabel, getIngredientCategoryKey, ingredientKey, resolvePlannedRecipes, type PlannedRecipe } from './shoppingList'
 
 type View = 'cookbook' | 'recipe' | 'planner' | 'shopping' | 'categories' | 'import' | 'manual'
 type RecipeSort = 'library' | 'shopping-recent'
@@ -41,18 +37,6 @@ type PersistedAppState = {
   completedShoppingItems: string[]
   removedShoppingItems: string[]
   categoryOverrides: Record<string, string>
-}
-
-type GroceryListItem = {
-  key: string
-  keys: string[]
-  item: string
-  count: number
-}
-
-type RawGroceryListItem = {
-  key: string
-  item: string
 }
 
 type CategoryIngredient = {
@@ -92,60 +76,6 @@ const recipePlaceholderImage = '/recipe-placeholder.svg'
 const scaleOptions = [0.5, 1, 2, 3]
 const recipeBatchSize = 36
 const viewIds = new Set<View>(views.map((view) => view.id))
-
-function ingredientKey(ingredient: Ingredient) {
-  return `${ingredient.item}__${ingredient.amount}`
-}
-
-function manualShoppingItemKey(item: string, itemIndex: number) {
-  return `manual:${itemIndex}:${ingredientKey(splitIngredient(item))}`
-}
-
-function formatIngredient(ingredient: Ingredient) {
-  return ingredient.amount ? `${ingredient.amount} ${ingredient.item}` : ingredient.item
-}
-
-function normalizeShoppingItemLabel(item: string) {
-  return item.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
-}
-
-function formatShoppingItemLabel(item: string) {
-  return normalizeShoppingItemLabel(item)
-}
-
-function getIngredientCategoryKey(item: string) {
-  return normalizeShoppingItemLabel(item)
-}
-
-function groupGroceryItems(items: RawGroceryListItem[]) {
-  const groupedItems = new Map<string, GroceryListItem>()
-
-  items.forEach((item) => {
-    const normalizedItem = normalizeShoppingItemLabel(item.item)
-    if (!normalizedItem) {
-      return
-    }
-
-    const currentItem = groupedItems.get(normalizedItem)
-
-    if (currentItem) {
-      currentItem.keys.push(item.key)
-      currentItem.count += 1
-      return
-    }
-
-    groupedItems.set(normalizedItem, {
-      key: item.key,
-      keys: [item.key],
-      item: formatShoppingItemLabel(item.item),
-      count: 1,
-    })
-  })
-
-  return Array.from(groupedItems.values()).sort((left, right) =>
-    left.item.localeCompare(right.item),
-  )
-}
 
 function resolveRecipeImage(image: string) {
   return image || recipePlaceholderImage
@@ -237,6 +167,8 @@ function App() {
   const recipeListSentinelRef = useRef<HTMLDivElement | null>(null)
   const historyInitializedRef = useRef(false)
   const handlingPopStateRef = useRef(false)
+  const stateVersionRef = useRef<string | null>(null)
+  const pendingSaveRef = useRef(Promise.resolve())
 
   useEffect(() => {
     let ignore = false
@@ -254,6 +186,7 @@ function App() {
           return
         }
 
+        stateVersionRef.current = response.headers.get('etag')
         const mergedRecipes = mergeRecipeLibrary(payload.importedRecipes)
         const availableRecipeIds = new Set(mergedRecipes.map((recipe) => recipe.id))
 
@@ -341,7 +274,8 @@ function App() {
 
     let ignore = false
     const timeoutId = window.setTimeout(() => {
-      void (async () => {
+      pendingSaveRef.current = pendingSaveRef.current.then(async () => {
+        if (ignore) return
         try {
           const importedRecipes = recipeLibrary.filter((recipe) => {
             const baseRecipe = baseRecipesById.get(recipe.id)
@@ -357,6 +291,7 @@ function App() {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
+              ...(stateVersionRef.current ? { 'If-Match': stateVersionRef.current } : {}),
             },
             body: JSON.stringify({
               importedRecipes,
@@ -375,6 +310,7 @@ function App() {
             throw new Error(payload.error || 'Unable to save app state.')
           }
 
+          stateVersionRef.current = response.headers.get('etag')
           if (!ignore) {
             setStateError('')
           }
@@ -385,7 +321,7 @@ function App() {
             )
           }
         }
-      })()
+      })
     }, 300)
 
     return () => {
@@ -446,17 +382,7 @@ function App() {
     (plannedRecipe) => plannedRecipe.recipeId === selectedRecipe.id,
   )
 
-  const plannedRecipes = plannedRecipesState
-    .map((plannedRecipe) => {
-      const recipe = recipeLibrary.find((entry) => entry.id === plannedRecipe.recipeId)
-      return recipe ? { recipe, excludedIngredientKeys: plannedRecipe.excludedIngredientKeys } : null
-    })
-    .filter(
-      (
-        plannedRecipe,
-      ): plannedRecipe is { recipe: Recipe; excludedIngredientKeys: string[] } =>
-        Boolean(plannedRecipe),
-    )
+  const plannedRecipes = resolvePlannedRecipes(recipeLibrary, plannedRecipesState)
 
   function resolveIngredientAisle(ingredient: Ingredient) {
     return categoryOverrides[getIngredientCategoryKey(ingredient.item)] || ingredient.aisle
@@ -500,84 +426,8 @@ function App() {
     ]),
   ) as Record<string, CategoryIngredient[]>
 
-  const groceryByAisle = plannedRecipes.reduce<Record<string, RawGroceryListItem[]>>((groups, plannedRecipe) => {
-    plannedRecipe.recipe.ingredients
-      .filter(
-        (ingredient) =>
-          !plannedRecipe.excludedIngredientKeys.includes(ingredientKey(ingredient)),
-      )
-      .forEach((ingredient, ingredientIndex) => {
-        const aisle = resolveIngredientAisle(ingredient)
-
-        if (!groups[aisle]) {
-          groups[aisle] = []
-        }
-
-        groups[aisle].push({
-          key: `recipe:${plannedRecipe.recipe.id}:${ingredientIndex}:${ingredientKey(ingredient)}`,
-          item: formatIngredient(ingredient),
-        })
-      })
-
-    return groups
-  }, {})
-
-  manualShoppingItems
-    .map((item, itemIndex) => ({ ingredient: splitIngredient(item), itemIndex }))
-    .forEach(({ ingredient, itemIndex }) => {
-      const aisle = resolveIngredientAisle(ingredient)
-
-      if (!groceryByAisle[aisle]) {
-        groceryByAisle[aisle] = []
-      }
-
-      groceryByAisle[aisle].push({
-        key: manualShoppingItemKey(manualShoppingItems[itemIndex], itemIndex),
-        item: formatIngredient(ingredient),
-      })
-    })
-
-  const completedShoppingItemSet = new Set(completedShoppingItems)
-  const neededShoppingItemSet = new Set(neededShoppingItems)
-  const removedShoppingItemSet = new Set(removedShoppingItems)
-
-  const checkShoppingItems = groupGroceryItems(
-    Object.values(groceryByAisle)
-      .flat()
-      .filter(
-      (item) =>
-        !neededShoppingItemSet.has(item.key) &&
-        !completedShoppingItemSet.has(item.key) &&
-        !removedShoppingItemSet.has(item.key),
-      ),
-  )
-
-  const visibleGroceryByAisle = Object.fromEntries(
-    Object.entries(groceryByAisle)
-      .map(
-        ([aisle, items]): [string, GroceryListItem[]] => [
-          aisle,
-          groupGroceryItems(
-            items.filter(
-              (item) =>
-                neededShoppingItemSet.has(item.key) &&
-                !completedShoppingItemSet.has(item.key) &&
-                !removedShoppingItemSet.has(item.key),
-            ),
-          ),
-        ],
-      )
-      .filter(([, items]) => items.length > 0),
-  ) as Record<string, GroceryListItem[]>
-
-  const doneShoppingItems = Object.entries(groceryByAisle).flatMap(([aisle, items]) =>
-    groupGroceryItems(
-      items.filter(
-        (item) =>
-          completedShoppingItemSet.has(item.key) &&
-          !removedShoppingItemSet.has(item.key),
-      ),
-    ).map((item) => ({ ...item, aisle })),
+  const { groceryByAisle, checkShoppingItems, visibleGroceryByAisle, doneShoppingItems } = buildShoppingList(
+    plannedRecipes, { manualShoppingItems, neededShoppingItems, completedShoppingItems, removedShoppingItems, categoryOverrides },
   )
 
 
