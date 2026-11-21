@@ -24,7 +24,7 @@ Base path: `/api/v1`. Supply `Authorization: Bearer <token>`. Write bodies use `
 | DELETE | `/planner/:id` | Remove that recipe from the plan, not from the Cookbook. |
 | GET | `/shopping` | Read `toCheck`, `needToBuy` grouped by aisle, and `bought`. New planned ingredients appear in `toCheck`, just like in the UI. |
 
-To create a recipe, pass a JSON file to `node scripts/pantry.mjs create <recipe.json>`. The body needs `title`, `ingredients` (one ingredient line per string), and `steps` (one step per string). Optional fields: `author`, `source`, `section`, `tags` (array), `time`, `servings`, and `summary`. Each successful POST creates a new recipe; after a timeout, search before retrying. To plan it, use `node scripts/pantry.mjs plan-add <id>` with the returned ID. The API also accepts `excludedIngredientKeys` on planner PUT, using `<item>__<amount>` from the recipe details. An empty array clears exclusions.
+To create a recipe, pass a JSON file to `node scripts/pantry.mjs create <recipe.json>`. The body needs `title`, `ingredients` (one ingredient line per string), and `steps` (one step per string). Optional fields: `author`, `source`, `section`, `tags` (array), `time`, `servings`, `image`, and `summary`. Each successful POST creates a new recipe; after a timeout, search before retrying. To plan it, use `node scripts/pantry.mjs plan-add <id>` with the returned ID. The API also accepts `excludedIngredientKeys` on planner PUT, using `<item>__<amount>` from the recipe details. An empty array clears exclusions.
 
 The token grants access only to these endpoints, not to browser sessions or to the full-state endpoint. There is no recipe deletion, full-state replacement, or external URL fetching through this API.
 

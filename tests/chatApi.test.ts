@@ -46,11 +46,15 @@ try {
   const matches = await seeded.json()
   assert.equal(matches.recipes.length, 1)
   assert.equal((await request(`/recipes/${matches.recipes[0].id}`)).status, 200)
-  const draft = { title: 'Chat test soup', ingredients: ['200 g red lentils', '1 onion'], steps: ['Simmer until tender.'] }
+  const draft = {
+    title: 'Chat test soup', ingredients: ['200 g red lentils', '1 onion'], steps: ['Simmer until tender.'],
+    image: '/book-images/chat-test.jpg',
+  }
   assert.equal((await request('/recipes', 'POST', { title: 'Incomplete' })).status, 400)
   const created = await request('/recipes', 'POST', draft)
   assert.equal(created.status, 201)
   const { recipe } = await created.json()
+  assert.equal(recipe.image, draft.image)
   const cli = await promisify(execFile)(process.execPath, ['scripts/pantry.mjs', 'search', 'chat test'], {
     env: { ...process.env, PANTRY_API_URL: base, PANTRY_API_TOKEN: token },
   })

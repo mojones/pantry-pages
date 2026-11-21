@@ -125,7 +125,7 @@ export function createChatApi(directory: string, token = process.env.PANTRY_API_
       author: text(body.author, 'author', 200), source: text(body.source, 'source', 1000) || 'Chat API',
       section: text(body.section, 'section', 100) || 'Manual', tags: list(body.tags, 'tags', 30, 80),
       time: text(body.time, 'time', 100), servings: text(body.servings, 'servings', 100),
-      image: '', summary: text(body.summary, 'summary', 2000) || 'Added through the Pantry Pages API.',
+      image: text(body.image, 'image', 1000), summary: text(body.summary, 'summary', 2000) || 'Added through the Pantry Pages API.',
     }
     const recipe = await updatePersistedState((state) => {
       const recipe = buildImportedRecipe(draft, new Set(library(state.importedRecipes).map(({ id }) => id)))
