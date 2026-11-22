@@ -242,6 +242,13 @@ function stateVersion(state: PersistedAppState) {
   return `"${createHash('sha256').update(JSON.stringify(state)).digest('hex')}"`
 }
 
+function setStateVersionHeaders(response: ServerResponse, state: PersistedAppState) {
+  const version = stateVersion(state)
+  response.setHeader('ETag', version)
+  // Proxies may rewrite ETag when compressing the response, but not the save version.
+  response.setHeader('Pantry-State-Version', version)
+}
+
 // Serialize read-modify-write operations and browser saves in this process.
 let pendingWrite: Promise<unknown> = Promise.resolve()
 function updatePersistedState<T>(update: (current: PersistedAppState) => { state?: PersistedAppState; result: T }) {
@@ -287,7 +294,7 @@ function registerAppApiRoutes(middlewares: MiddlewareStack) {
     if (request.method === 'GET') {
       try {
         const state = await readPersistedState()
-        response.setHeader('ETag', stateVersion(state))
+        setStateVersionHeaders(response, state)
         response.setHeader('Cache-Control', 'no-store')
         sendJson(response, 200, state)
       } catch (error) {
@@ -313,7 +320,7 @@ function registerAppApiRoutes(middlewares: MiddlewareStack) {
           sendJson(response, status, { error: 'Saved data changed or your tab is out of date. Copy any unsaved edits, then reload Pantry Pages.' })
           return
         }
-        response.setHeader('ETag', stateVersion(state))
+        setStateVersionHeaders(response, state)
         sendJson(response, 200, { ok: true })
       } catch (error) {
         const message =

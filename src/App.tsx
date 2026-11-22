@@ -186,7 +186,7 @@ function App() {
           return
         }
 
-        stateVersionRef.current = response.headers.get('etag')
+        stateVersionRef.current = response.headers.get('Pantry-State-Version')
         const mergedRecipes = mergeRecipeLibrary(payload.importedRecipes)
         const availableRecipeIds = new Set(mergedRecipes.map((recipe) => recipe.id))
 
@@ -310,7 +310,7 @@ function App() {
             throw new Error(payload.error || 'Unable to save app state.')
           }
 
-          stateVersionRef.current = response.headers.get('etag')
+          stateVersionRef.current = response.headers.get('Pantry-State-Version')
           if (!ignore) {
             setStateError('')
           }

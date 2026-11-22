@@ -39,7 +39,15 @@ try {
   assert.equal((await fetch(`${base}/api/state`, { headers: auth, redirect: 'manual' })).status, 302)
   const snapshot = await fetch(`${base}/api/state`, { headers: browserAuth })
   assert.equal(snapshot.status, 200)
-  const version = snapshot.headers.get('etag')!
+  function versionAfterCompression(response: Response) {
+    const headers = new Headers(response.headers)
+    // Railway can weaken the representation's ETag when it gzips the response.
+    headers.set('ETag', `W/${headers.get('etag')}`)
+    const version = headers.get('Pantry-State-Version')
+    assert.match(version ?? '', /^"[a-f0-9]{64}"$/)
+    return version!
+  }
+  const version = versionAfterCompression(snapshot)
   const oldState = await snapshot.json()
   const seeded = await request('/recipes?q=lentils&limit=1')
   assert.equal(seeded.status, 200)
@@ -81,9 +89,15 @@ try {
   const saved = await current.json()
   assert.equal(saved.importedRecipes[0].id, recipe.id)
   saved.neededShoppingItems = shopping.toCheck[0].keys
-  assert.equal((await fetch(`${base}/api/state`, {
-    method: 'PUT', headers: { ...browserAuth, 'Content-Type': 'application/json', 'If-Match': current.headers.get('etag')! }, body: JSON.stringify(saved),
-  })).status, 200)
+  const save = (version: string) => fetch(`${base}/api/state`, {
+    method: 'PUT', headers: { ...browserAuth, 'Content-Type': 'application/json', 'If-Match': version }, body: JSON.stringify(saved),
+  })
+  const browserSave = await save(versionAfterCompression(current))
+  assert.equal(browserSave.status, 200)
+  saved.recipeNotes[recipe.id] = 'Saved on the second browser edit.'
+  assert.equal((await save(versionAfterCompression(browserSave))).status, 200)
+  const reread = await (await fetch(`${base}/api/state`, { headers: browserAuth })).json()
+  assert.equal(reread.recipeNotes[recipe.id], saved.recipeNotes[recipe.id])
   const after = await (await request('/shopping')).json()
   assert.equal(after.toCheck.length, 0)
   assert.equal(Object.values(after.needToBuy).flat().length, 1)
