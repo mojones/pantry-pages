@@ -1118,7 +1118,7 @@ function App() {
                 <p className="eyebrow">Planner View</p>
                 <h3>Recipes To Make</h3>
               </div>
-              <span className="badge">{plannedRecipes.length} planned</span>
+              {stateLoaded ? <span className="badge">{plannedRecipes.length} planned</span> : null}
             </div>
 
             <div className="planner-banner">
@@ -1138,7 +1138,14 @@ function App() {
               </div>
             </div>
 
-            {plannedRecipes.length > 0 ? (
+            {!stateLoaded ? (
+              !stateError ? (
+                <div className="planner-loading" role="status">
+                  <span className="planner-loading__spinner" aria-hidden="true" />
+                  Loading planned recipes…
+                </div>
+              ) : null
+            ) : plannedRecipes.length > 0 ? (
               <div className="planner-list">
                 {plannedRecipes.map((plannedRecipe) => {
                   const keptIngredients = plannedRecipe.recipe.ingredients.filter(

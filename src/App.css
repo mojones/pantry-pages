@@ -531,6 +531,38 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.planner-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--muted);
+}
+
+.planner-loading__spinner {
+  box-sizing: border-box;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: planner-spin 800ms linear infinite;
+}
+
+@keyframes planner-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planner-loading__spinner {
+    animation: none;
+  }
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
